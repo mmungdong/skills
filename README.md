@@ -105,6 +105,6 @@ Skills in `.claude/skills/` are project-level tools for managing this repository
 
 | Skill | Description | Version |
 |-------|-------------|---------|
-| [superpowers](skills/dev/superpowers/install_reference.md) | Practical Claude Code superpowers for enhanced development workflows | 1.0.0 |
+| [superpowers](skills/dev/superpowers/install_reference.md) | Practical Claude Code superpowers for enhanced development workflows | - |
 | [code-reviewer](skills/dev/code-reviewer/install_reference.md) | Code review skill from claude-code-templates | - |
 | [ui-ux-pro-max](skills/dev/ui-ux-pro-max/install_reference.md) | UI/UX design skill from claude-code-templates | - |
