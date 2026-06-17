@@ -87,6 +87,15 @@ ln -s $(pwd)/skills/dev/my-skill ~/.claude/skills/my-skill
 # 引用 skill：按 install_reference.md 中的说明安装
 ```
 
+## 项目 Skills
+
+`.claude/skills/` 中的 skill 是管理本仓库的项目级工具，不可分发。
+
+| Skill | Description | Version |
+|-------|-------------|---------|
+| [skill-sync](.claude/skills/skill-sync/SKILL.md) | 检查外部 skill 引用是否最新，从 GitHub 获取更新并同步本地记录 | 1.0.0 |
+| [skill-installer](.claude/skills/skill-installer/SKILL.md) | 检查安装状态，交互式安装 skill 到 Agent skills 目录 | 1.0.0 |
+
 ## 已收集的 Skills
 
 ### dev
