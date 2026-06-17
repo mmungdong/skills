@@ -104,3 +104,4 @@ ln -s $(pwd)/skills/dev/my-skill ~/.claude/skills/my-skill
 |-------|-------------|---------|
 | [superpowers](skills/dev/superpowers/install_reference.md) | Practical Claude Code superpowers for enhanced development workflows | 1.0.0 |
 | [code-reviewer](skills/dev/code-reviewer/install_reference.md) | 来自 claude-code-templates 的代码审查 skill | - |
+| [ui-ux-pro-max](skills/dev/ui-ux-pro-max/install_reference.md) | 来自 claude-code-templates 的 UI/UX 设计 skill | - |
