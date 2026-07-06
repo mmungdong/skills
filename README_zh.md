@@ -95,6 +95,7 @@ ln -s $(pwd)/skills/dev/my-skill ~/.claude/skills/my-skill
 |-------|-------------|---------|
 | [skill-sync](.claude/skills/skill-sync/SKILL.md) | 检查外部 skill 引用是否最新，从 GitHub 获取更新并同步本地记录 | 1.0.0 |
 | [skill-installer](.claude/skills/skill-installer/SKILL.md) | 检查安装状态，交互式安装 skill 到 Agent skills 目录 | 1.0.0 |
+| [agent-config](.claude/skills/agent-config/SKILL.md) | 通过软链把个人全局规范（agent-config/README.md）安装到各 agent 全局配置；支持安装、状态检查、卸载、重装 | 1.0.0 |
 
 ## 已收集的 Skills
 

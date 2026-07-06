@@ -98,6 +98,7 @@ Skills in `.claude/skills/` are project-level tools for managing this repository
 |-------|-------------|---------|
 | [skill-sync](.claude/skills/skill-sync/SKILL.md) | Check if external skill references are up-to-date, fetch updates from GitHub, and sync local records | 1.0.0 |
 | [skill-installer](.claude/skills/skill-installer/SKILL.md) | Check installation status and interactively install skills to Agent skills directories | 1.0.0 |
+| [agent-config](.claude/skills/agent-config/SKILL.md) | Install personal global conventions (agent-config/README.md) to each agent's global config via symlinks; supports install, status, uninstall, reinstall | 1.0.0 |
 
 ## Collected Skills
 
