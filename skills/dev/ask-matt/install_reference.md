@@ -7,14 +7,14 @@
 
 ## 安装
 
-mattpocock/skills 是集合仓库，需克隆整个仓库后软链接单个 skill：
+mattpocock/skills 是集合仓库，需克隆到本仓库 `vendor/` 目录后软链接单个 skill（`vendor/` 已被 `.gitignore` 排除）：
 
 ```bash
-# 克隆集合仓库
-git clone https://github.com/mattpocock/skills.git ~/mattpocock-skills
+# 克隆集合仓库到 vendor/（已克隆则跳过，pull 更新）
+git clone https://github.com/mattpocock/skills.git vendor/mattpocock-skills
 
 # 软链接单个 skill 到 Claude Code
-ln -s ~/mattpocock-skills/skills/engineering/ask-matt ~/.claude/skills/ask-matt
+ln -s vendor/mattpocock-skills/skills/engineering/ask-matt ~/.claude/skills/ask-matt
 ```
 
 ## 说明

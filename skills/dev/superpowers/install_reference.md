@@ -6,8 +6,18 @@
 
 ## 安装
 
+**当前实际集成方式：Claude Code plugin marketplace**（见 `~/.claude/plugins/marketplaces/superpowers-marketplace`），无需 vendor 软链。
+
+**备选：vendor 软链方式**（不通过 plugin marketplace 时使用）
+
+克隆到本仓库 `vendor/` 目录（已被 `.gitignore` 排除）后软链接：
+
 ```bash
-git clone https://github.com/obra/superpowers.git ~/.claude/skills/superpowers
+# 克隆源仓库到 vendor/（已克隆则跳过，pull 更新）
+git clone https://github.com/obra/superpowers.git vendor/superpowers
+
+# 软链接到 Claude Code
+ln -s vendor/superpowers ~/.claude/skills/superpowers
 ```
 
 ## Skills 列表
