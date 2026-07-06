@@ -102,6 +102,10 @@ ln -s $(pwd)/skills/dev/my-skill ~/.claude/skills/my-skill
 
 | Skill | Description | Version |
 |-------|-------------|---------|
-| [superpowers](skills/dev/superpowers/install_reference.md) | 实用 Claude Code 超能力，增强开发工作流 | - |
-| [code-reviewer](skills/dev/code-reviewer/install_reference.md) | 来自 claude-code-templates 的代码审查 skill | - |
-| [ui-ux-pro-max](skills/dev/ui-ux-pro-max/install_reference.md) | 来自 claude-code-templates 的 UI/UX 设计 skill | - |
+| [superpowers](skills/dev/superpowers/install_reference.md) | 实用 Claude Code 超能力，增强开发工作流 | 6.1.1 |
+| [code-reviewer](skills/dev/code-reviewer/install_reference.md) | 综合代码审查 skill，支持 TypeScript/JavaScript/Python/Swift/Kotlin/Go，含自动分析、最佳实践检查、安全扫描和审查清单 | 1.29.2 |
+| [ui-ux-pro-max](skills/dev/ui-ux-pro-max/install_reference.md) | UI/UX 设计智能，50 种风格、21 种配色、50 种字体搭配、20 种图表、9 种技术栈 | 1.29.2 |
+| [grill-with-docs](skills/dev/grill-with-docs/install_reference.md) | 反复盘问以打磨计划或设计，过程中沉淀 ADR 和术语表等文档 | 1.0.1 |
+| [to-prd](skills/dev/to-prd/install_reference.md) | 将当前对话整理成 PRD 并发布到项目 issue 跟踪器 | 1.0.1 |
+| [to-issues](skills/dev/to-issues/install_reference.md) | 用 tracer-bullet 垂直切片将计划、spec 或 PRD 拆成可独立领取的 issue | 1.0.1 |
+| [ask-matt](skills/dev/ask-matt/install_reference.md) | 询问哪种 skill 或流程适合当前情境——本仓库技能的路由器 | 1.0.1 |

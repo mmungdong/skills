@@ -1,6 +1,6 @@
 ---
 name: skill-sync
-description: Check if external skill references in this project are up-to-date. Scans all install_reference.md files, fetches latest state from GitHub, compares with local records, and optionally updates them. Use when you want to check for skill updates, see what changed in external skill repos, or sync local references.
+description: 检查本项目中外部 skill 引用是否为最新。扫描所有 install_reference.md 文件，从 GitHub 获取最新状态，与本地记录对比，并可选地更新本地记录。适用于检查 skill 更新、查看外部 skill 仓库的变化，或同步本地引用。
 metadata:
   version: 1.0.0
 ---

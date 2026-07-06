@@ -1,6 +1,6 @@
 ---
 name: skill-installer
-description: Check installation status of all skills in this project and support interactive installation. Scans skills/skills/ for installable skills, checks which are installed across agents, and creates symlinks or runs install commands. Use when you want to check skill status, install skills, or manage local skill installations.
+description: 检查本项目中所有 skill 的安装状态并支持交互式安装。扫描 skills/skills/ 下的可安装 skill，检查各 Agent 中已安装的情况，并通过创建符号链接或执行安装命令完成安装。适用于查看 skill 状态、安装 skill 或管理本地 skill 安装。
 metadata:
   version: 1.0.0
 ---
