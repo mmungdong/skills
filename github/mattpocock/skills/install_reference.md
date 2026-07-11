@@ -18,8 +18,8 @@ git clone https://github.com/mattpocock/skills.git ~/.claude/skills/mattpocock-s
 | ask-matt | Ask which skill or flow fits your situation. A router over the skills in this repo | ✅ |
 | code-review | Review changes since a fixed point along two axes — Standards and Spec. Runs both reviews in parallel sub-agents and reports them side by side | ❌ |
 | codebase-design | Shared vocabulary for designing deep modules. Use when designing or improving a module's interface, finding deepening opportunities, or deciding where a seam goes | ❌ |
-| diagnosing-bugs | Diagnosis loop for hard bugs and performance regressions. Use when the user says "diagnose"/"debug this", or reports something broken/throwing/failing/slow | ❌ |
-| domain-modeling | Build and sharpen a project's domain model. Use when pinning down domain terminology, recording an architectural decision, or maintaining the domain model | ❌ |
+| diagnosing-bugs | Diagnosis loop for hard bugs and performance regressions. Use when the user says "diagnose"/"debug this", or reports something broken/throwing/failing/slow | ✅ |
+| domain-modeling | Build and sharpen a project's domain model. Use when pinning down domain terminology, recording an architectural decision, or maintaining the domain model | ✅ |
 | grill-with-docs | A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go | ✅ |
 | implement | Implement a piece of work based on a PRD or set of issues | ❌ |
 | improve-codebase-architecture | Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick | ❌ |
@@ -52,8 +52,8 @@ git clone https://github.com/mattpocock/skills.git ~/.claude/skills/mattpocock-s
 
 | Skill | Description | 已集成 |
 |-------|-------------|--------|
-| grill-me | A relentless interview to sharpen a plan or design | ❌ |
-| grilling | Grill the user relentlessly about a plan or design. Use to stress-test a plan before building, or on any 'grill' trigger phrases | ❌ |
+| grill-me | A relentless interview to sharpen a plan or design | ✅ |
+| grilling | Grill the user relentlessly about a plan or design. Use to stress-test a plan before building, or on any 'grill' trigger phrases | ✅ |
 | handoff | Compact the current conversation into a handoff document for another agent to pick up | ❌ |
 | teach | Teach the user a new skill or concept, within the workspace | ❌ |
 | writing-great-skills | Reference for writing and editing skills well — the vocabulary and principles that make a skill predictable | ❌ |

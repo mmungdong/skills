@@ -164,6 +164,10 @@ ln -s "$(pwd)/skills/dev/my-skill" ~/.claude/skills/my-skill
 | [to-prd](skills/dev/to-prd/install_reference.md) | 将当前对话整理成 PRD 并发布到项目 issue 跟踪器 | 1.0.1 |
 | [to-issues](skills/dev/to-issues/install_reference.md) | 用 tracer-bullet 垂直切片将计划、spec 或 PRD 拆成可独立领取的 issue | 1.0.1 |
 | [ask-matt](skills/dev/ask-matt/install_reference.md) | 询问哪种 skill 或流程适合当前情境——本仓库技能的路由器 | 1.0.1 |
+| [grill-me](skills/dev/grill-me/install_reference.md) | 反复盘问以打磨计划或设计——轻量版，纯对话无文档沉淀 | 1.0.1 |
+| [grilling](skills/dev/grilling/install_reference.md) | 反复盘问用户以打磨计划或设计；'grill' 等触发词驱动 | 1.0.1 |
+| [domain-modeling](skills/dev/domain-modeling/install_reference.md) | 构建并打磨项目领域模型——统一术语、记录架构决策、维护术语表 | 1.0.1 |
+| [diagnosing-bugs](skills/dev/diagnosing-bugs/install_reference.md) | 疑难 bug 与性能回归的诊断循环——先定位根因再修复 | 1.0.1 |
 
 ---
 
