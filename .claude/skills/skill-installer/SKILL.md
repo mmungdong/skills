@@ -102,51 +102,70 @@ Three questions per skill (or per batch if installing all to same target):
 - OpenCode
 - 其他（请输入 skills 目录路径）
 
-#### 3. Execute Installation
+#### 3. Scan & Deduplicate Source Repos (Batch Clone Plan)
 
-**Custom skill (has SKILL.md):**
+**Before cloning anything**, scan all selected skills' `install_reference.md` and build a deduplicated list of source repos to clone. This avoids re-cloning the same collection repo (e.g. `mattpocock/skills`) once per skill.
 
-Custom skills live in this repo, so no cloning is needed — symlink directly.
+For each selected referenced skill, extract from its `install_reference.md`:
+- `<source-url>` — the git remote (e.g. `https://github.com/mattpocock/skills.git`)
+- `<source-repo-name>` — short name for the `vendor/` subdirectory (e.g. `mattpocock-skills`)
+- `<path-to-skill-inside-repo>` — subdirectory within the source repo holding this skill
 
-```bash
-# Determine target directory based on answers
-# Global Claude Code: ~/.claude/skills/<skill-name>
-# Project Claude Code: <project>/.claude/skills/<skill-name>
-# Global OpenCode: ~/.opencode/skills/<skill-name>
-# Project OpenCode: <project>/.opencode/skills/<skill-name>
-# Other: <custom-path>/<skill-name>
+Group skills by `<source-url>` and build the clone plan table:
 
-# Create symlink
-ln -s <this-repo>/skills/skills/<category>/<skill-name> <target-dir>/<skill-name>
+```
+| source-url                         | vendor dir          | skills covered                          | already cloned? |
+|------------------------------------|---------------------|-----------------------------------------|-----------------|
+| https://github.com/mattpocock/skills.git | vendor/mattpocock-skills | grill-me, grilling, domain-modeling | yes / no        |
+| https://github.com/davila7/claude-code-templates.git | vendor/claude-code-templates | code-reviewer, ui-ux-pro-max | yes / no |
 ```
 
-**Referenced skill (has install_reference.md):**
+Determine `already cloned?` by checking `vendor/<source-repo-name>/.git`:
 
-Two-step flow: **clone the source repo into `vendor/` first, then symlink the target skill into the Agent directory.** Never clone into `~/` or the Agent directory directly.
+```bash
+[ -d "$REPO/vendor/<source-repo-name>/.git" ] && echo yes || echo no
+```
+
+Display the table to the user and state the action plan:
+- Repos marked **yes** → `git -C vendor/<dir> pull --ff-only` to refresh, **no re-clone**
+- Repos marked **no** → `git clone <source-url> vendor/<source-repo-name>` exactly **once**, shared by all skills in that group
+
+> 💡 One `vendor/<source-repo-name>/` backs every skill in its group. For a collection repo with N sub-skills, there is ever only 1 clone, not N.
+
+#### 4. Execute Installation
+
+**Step A — Clone/refresh each unique source repo** (run once per repo, not per skill):
 
 ```bash
 REPO=<this-repo>   # absolute path to this skills repo
 
-# Step 1: Clone source repo into vendor/ (skip if already cloned)
-# Derive a short name for the vendor subdirectory from the source repo.
-VENDOR_DIR="$REPO/vendor/<source-repo-name>"
-if [ -d "$VENDOR_DIR/.git" ]; then
-  git -C "$VENDOR_DIR" pull --ff-only
-else
-  git clone <source-url> "$VENDOR_DIR"
-fi
+for each unique repo in the clone plan:
+  VENDOR_DIR="$REPO/vendor/<source-repo-name>"
+  if [ -d "$VENDOR_DIR/.git" ]; then
+    git -C "$VENDOR_DIR" pull --ff-only       # already cloned → just refresh
+  else
+    git clone <source-url> "$VENDOR_DIR"      # clone once for the whole group
+  fi
+done
+```
 
-# Step 2: Symlink the target skill into the Agent skills directory
-ln -s "$VENDOR_DIR/<path-to-skill-inside-repo>" <target-dir>/<skill-name>
+**Step B — Symlink each skill into the Agent directory** (per skill, reusing the cloned repo):
+
+```bash
+# Custom skill (has SKILL.md, lives in this repo — no clone needed):
+ln -s "$REPO/skills/skills/<category>/<skill-name>" <target-dir>/<skill-name>
+
+# Referenced skill (reuses the vendor/ clone from Step A):
+ln -s "$REPO/vendor/<source-repo-name>/<path-to-skill-inside-repo>" <target-dir>/<skill-name>
 ```
 
 **Notes on referenced skill install:**
 - Read `install_reference.md` for the `<source-url>` and the `<path-to-skill-inside-repo>` (the subdirectory within the source repo that holds the skill).
-- For collection repos (e.g. `mattpocock/skills`), one clone in `vendor/` backs multiple skills — reuse the existing `vendor/<source-repo-name>/` for sibling skills instead of re-cloning.
+- For collection repos (e.g. `mattpocock/skills`), one clone in `vendor/` backs multiple skills — reuse the existing `vendor/<source-repo-name>/` for sibling skills instead of re-cloning; Step 3's dedup table makes this explicit.
 - For npm-based skills whose installer (`npx claude-code-templates@latest --skill ...`) hits GitHub API rate limits, fall back to cloning the upstream source repo (e.g. `davila7/claude-code-templates`) into `vendor/` and symlinking, which bypasses the API entirely.
 - If `install_reference.md` records a different install method (e.g. `git clone` directly into `~/.claude/skills/`), still redirect the clone into `vendor/` and symlink — keep all third-party code under `vendor/`.
 
-#### 4. Verify and Refresh
+#### 5. Verify and Refresh
 
 After installation, re-check status for installed skills:
 
@@ -159,9 +178,10 @@ Display updated status table.
 ## Important Notes
 
 - Only `skills/skills/` is scanned for installation; `github/` is excluded
+- **Always scan & deduplicate source repos before cloning** — when installing multiple referenced skills, first build a per-`<source-url>` clone plan so each source repo (especially collection repos) is cloned at most once, then symlink skills in a separate pass
 - All third-party source repos live under `vendor/` (git-ignored) — never clone into `~/` or Agent directories directly; always clone into `vendor/` then symlink
 - `vendor/` is local-only and never committed; on a fresh machine it is rebuilt by re-running installs
-- For collection repos (e.g. mattpocock/skills with 18 sub-skills), one clone in `vendor/` backs many skills — reuse it for siblings instead of re-cloning
+- For collection repos (e.g. mattpocock/skills with 18 sub-skills), one clone in `vendor/` backs many skills — reuse it for siblings instead of re-cloning; the Step 3 dedup table surfaces this automatically
 - When installing to project-level, ensure the project's `.claude/skills/` directory exists before creating symlinks
 - If a skill is already installed (✅), ask the user whether to reinstall/overwrite before proceeding
 - Symlink targets should use absolute paths to avoid broken links when working directories change
