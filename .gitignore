@@ -1,3 +1,9 @@
 # Third-party skill source repos cloned by skill-installer
 # Local only — never committed
 /vendor/
+.DS_Store
+Thumbs.db
+*.tmp
+.skills-manager.lock
+__pycache__/
+*.pyc

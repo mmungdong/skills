@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "f24ac4c7-97cf-4c4b-ac8e-ad493b3c09e2",
+  "path": ".claude/skills/skill-installer",
+  "path_key": ".claude/skills/skill-installer",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "import",
+    "ref": null,
+    "subpath": null,
+    "branch": null
+  }
+}

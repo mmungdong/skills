@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "d5b11a63-645a-4d88-85cd-1d12561747d0",
+  "path": ".claude/skills/agent-config",
+  "path_key": ".claude/skills/agent-config",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "import",
+    "ref": null,
+    "subpath": null,
+    "branch": null
+  }
+}
