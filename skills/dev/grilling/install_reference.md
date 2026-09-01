@@ -19,9 +19,9 @@ ln -s vendor/mattpocock-skills/skills/productivity/grilling ~/.claude/skills/gri
 
 ## 说明
 
-Grill the user relentlessly about a plan or design. Use to stress-test a plan before building, or on any 'grill' trigger phrases.
+Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases.
 
-触发词驱动版澄清：用户说出 "grill" 等触发短语时自动介入，对计划或设计逐层施压测试。
+触发词驱动版澄清：用户说出 "grill" 等触发短语时自动介入，对计划、决策或想法逐层施压测试。
 
 ## 选型定位
 

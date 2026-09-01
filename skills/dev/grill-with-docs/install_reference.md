@@ -19,10 +19,10 @@ ln -s vendor/mattpocock-skills/skills/engineering/grill-with-docs ~/.claude/skil
 
 ## 说明
 
-Relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go.
+A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go.
 
-适用于从 0 到 1 的探索项目：当第一版边界、核心场景、非目标和验收标准还不清楚时，用它反复追问模糊点，并把术语、边界和决策沉淀到 CONTEXT.md、ADR 或 PRD，减少后续返工。
+适用于从 0 到 1 的探索项目：当第一版边界、核心场景、非目标和验收标准还不清楚时，用它反复追问模糊点，并把术语、边界和决策沉淀到 CONTEXT.md、ADR 或 spec，减少后续返工。
 
 ## 选型定位
 
-探索期需求澄清工具。来自 mattpocock/skills 澄清链路：`grill-with-docs → to-prd → to-issues → ask-matt → implement`。
+探索期需求澄清工具。来自 mattpocock/skills 澄清链路：`grill-with-docs → to-spec → to-tickets → ask-matt → implement`。

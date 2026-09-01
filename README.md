@@ -6,7 +6,7 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Claude%20Code-7c3aed.svg)](https://claude.com/claude-code)
-[![Skills](https://img.shields.io/badge/Skills-10%2B-16a34a.svg)](#-collected-skills)
+[![Skills](https://img.shields.io/badge/Skills-9%2B-16a34a.svg)](#-collected-skills)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-ff69b4.svg)](https://github.com/mmungdong/skills/pulls)
 
 [English](./README.md) · [中文](./README_zh.md)
@@ -160,13 +160,11 @@ Skills in `.claude/skills/` are project-level tools for managing this repository
 | [superpowers](skills/dev/superpowers/install_reference.md) | Practical Claude Code superpowers for enhanced development workflows | 6.1.1 |
 | [code-reviewer](skills/dev/code-reviewer/install_reference.md) | Comprehensive code review skill for TypeScript, JavaScript, Python, Swift, Kotlin, Go — automated analysis, best-practice checking, security scanning, and review checklists | 1.29.2 |
 | [ui-ux-pro-max](skills/dev/ui-ux-pro-max/install_reference.md) | UI/UX design intelligence — 50 styles, 21 palettes, 50 font pairings, 20 charts, 9 stacks (React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter, Tailwind, shadcn/ui) | 1.29.2 |
-| [grill-with-docs](skills/dev/grill-with-docs/install_reference.md) | Relentless interview to sharpen a plan or design, also creating docs (ADRs and glossary) as you go | 1.0.1 |
-| [to-prd](skills/dev/to-prd/install_reference.md) | Turn the current conversation into a PRD and publish it to the project issue tracker | 1.0.1 |
-| [to-issues](skills/dev/to-issues/install_reference.md) | Break a plan, spec, or PRD into independently-grabbable issues using tracer-bullet vertical slices | 1.0.1 |
-| [ask-matt](skills/dev/ask-matt/install_reference.md) | Ask which skill or flow fits your situation — a router over the skills in this repo | 1.0.1 |
+| [grill-with-docs](skills/dev/grill-with-docs/install_reference.md) | A relentless interview to sharpen a plan or design, also creating docs (ADRs and glossary) as you go | 1.0.1 |
+| [ask-matt](skills/dev/ask-matt/install_reference.md) | Ask which skill or flow fits your situation. A router over the skills in this repo | 1.0.1 |
 | [grill-me](skills/dev/grill-me/install_reference.md) | A relentless interview to sharpen a plan or design — lightweight, conversation-only | 1.0.1 |
-| [grilling](skills/dev/grilling/install_reference.md) | Grill the user relentlessly about a plan or design; triggers on 'grill' phrases | 1.0.1 |
-| [domain-modeling](skills/dev/domain-modeling/install_reference.md) | Build and sharpen a project's domain model — ubiquitous language, ADRs, glossary | 1.0.1 |
+| [grilling](skills/dev/grilling/install_reference.md) | Grill the user relentlessly about a plan, decision, or idea; triggers on 'grill' phrases | 1.0.1 |
+| [domain-modeling](skills/dev/domain-modeling/install_reference.md) | Build and sharpen a project's domain model — ubiquitous language, CONTEXT.md, ADRs | 1.0.1 |
 | [diagnosing-bugs](skills/dev/diagnosing-bugs/install_reference.md) | Diagnosis loop for hard bugs and performance regressions — root cause before fixes | 1.0.1 |
 
 ---

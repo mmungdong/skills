@@ -19,9 +19,9 @@ ln -s vendor/mattpocock-skills/skills/engineering/domain-modeling ~/.claude/skil
 
 ## 说明
 
-Build and sharpen a project's domain model. Use when pinning down domain terminology or a ubiquitous language, record an architectural decision, or when another skill needs to maintain the domain model.
+Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a CONTEXT.md, or recording or editing an ADR.
 
-适用于项目进入实现期：统一团队术语（ubiquitous language），记录架构决策（ADR），让领域知识从对话沉淀为可维护的模型文档。
+适用于项目进入实现期：统一团队术语（ubiquitous language），编写或维护 CONTEXT.md，记录架构决策（ADR），让领域知识从对话沉淀为可维护的模型文档。
 
 ## 选型定位
 

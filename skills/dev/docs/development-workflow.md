@@ -13,7 +13,7 @@ superpowers 与 mattpocock/skills **不是谁替代谁，而是适合不同阶�
 | 工具 | 定位 | 适合阶段 |
 |------|------|---------|
 | **superpowers** | 一套完整的软件开发方法论（brainstorming → spec → plan → TDD → review → branch 收尾） | 已知道做什么、怎么拆、怎么验收，让 AI 按规矩把功能做出来 |
-| **mattpocock/skills** | 一组可组合的工程技能（grill 澄清 / to-prd 落文档 / to-issues 拆任务 / tdd / debug / review） | 还在想清楚"到底做什么、第一版不做什么、怎么验收" |
+| **mattpocock/skills** | 一组可组合的工程技能（grill 澄清 / to-spec 落文档 / to-tickets 拆任务 / tdd / debug / review） | 还在想清楚"到底做什么、第一版不做什么、怎么验收" |
 
 **白话版**：
 - 已经知道要做什么、怎么拆、怎么验收 → **superpowers**
@@ -34,7 +34,7 @@ superpowers 与 mattpocock/skills **不是谁替代谁，而是适合不同阶�
 
 每次返工单次看都不大，但累积起来消耗大量上下文、时间和 token。
 
-**关键澄清**：superpowers 的 brainstorming 是整条开发流水线的**入口**（帮 agent 进入 spec/plan/TDD/review 链路）；而 `grill-with-docs` 的重点是**反复追问模糊点**，并把术语、边界、决策沉淀到 CONTEXT.md、ADR 或 PRD。从 0 到 1 的项目最缺的不是开发入口，而是有人把"你以为已经清楚"的地方继续问下去。
+**关键澄清**：superpowers 的 brainstorming 是整条开发流水线的**入口**（帮 agent 进入 spec/plan/TDD/review 链路）；而 `grill-with-docs` 的重点是**反复追问模糊点**，并把术语、边界、决策沉淀到 CONTEXT.md、ADR 或 spec。从 0 到 1 的项目最缺的不是开发入口，而是有人把"你以为已经清楚"的地方继续问下去。
 
 **教训**：从 0 到 1 的项目，不要一上来就把自己交给执行流程。**先把问题问清楚，再让工具提高执行效率。**
 
@@ -44,17 +44,17 @@ superpowers 与 mattpocock/skills **不是谁替代谁，而是适合不同阶�
 
 | 当前状态 | 更适合 | 原因 |
 |---------|--------|------|
-| 还不知道第一版到底做什么、不做什么、怎么验收 | mattpocock/skills | 先用 grill、to-prd、to-issues 把问题问清楚 |
+| 还不知道第一版到底做什么、不做什么、怎么验收 | mattpocock/skills | 先用 grill、to-spec、to-tickets 把问题问清楚 |
 | 项目很复杂，需要从 0 到 1 慢慢拆清楚 | mattpocock/skills | 可分阶段组织复杂项目，不是只能补小任务 |
 | 已有 spec 模板、任务切片方式和验收命令 | superpowers | 项目已进入"按规格开发"阶段 |
-| 明确要交付一个 issue | implement | 围绕 PRD 或 issue 做完整交付闭环 |
+| 明确要交付一个 ticket | implement | 围绕 spec 或 ticket 做完整交付闭环 |
 | 测试失败、构建失败、bug 明确 | diagnosing-bugs | 用明确失败信号驱动修复 |
 
 ---
 
 ## 4. 什么时候先用 mattpocock/skills
 
-> 只要你还在定义问题、流程资产和任务粒度，就先用 mattpocock/skills。复杂项目不能一次性交给 agent "全做完"——先澄清需求，再沉淀 PRD，再拆 issue，再一段一段实现和验证。mattpocock/skills 的优势是把这些阶段拆开，让每一步都有产物。
+> 只要你还在定义问题、流程资产和任务粒度，就先用 mattpocock/skills。复杂项目不能一次性交给 agent "全做完"——先澄清需求，再沉淀 spec，再拆 ticket，再一段一段实现和验证。mattpocock/skills 的优势是把这些阶段拆开，让每一步都有产物。
 
 ### 4.1 需求还没问清楚 → `grill-with-docs`
 
@@ -69,37 +69,37 @@ $grill-with-docs
 - 会追问"为什么第一版不做这个""谁会用这个能力""怎么验收才算完成"
 - 如果项目已有代码和文档，会沉淀 CONTEXT.md 和 ADR，减少后续反复解释
 
-### 4.2 写需求文档 → `to-prd`
+### 4.2 写需求文档 → `to-spec`
 
-需求澄清完，不要马上开工，先把讨论结果整理成 PRD。
+需求澄清完，不要马上开工，先把讨论结果整理成 spec。
 
 ```
-$to-prd
-请基于刚才的讨论、CONTEXT.md 和 ADR，整理 X v0 的 PRD。
+$to-spec
+请基于刚才的讨论、CONTEXT.md 和 ADR，整理 X v0 的 spec。
 ```
 
-- PRD 不是形式主义，是把"我以为你知道"变成"后续每个 agent 都能读懂"
+- spec 不是形式主义，是把"我以为你知道"变成"后续每个 agent 都能读懂"
 - 至少写清：目标、非目标、用户路径、约束、验收标准、风险
 
-### 4.3 创建独立开发任务 → `to-issues`
+### 4.3 创建独立开发任务 → `to-tickets`
 
-PRD 后不要直接让 agent "开始实现"——一个 PRD 往往含多个方向（数据结构、运行时、UI、测试、文档、验证脚本），一次全做容易互相牵扯。
+spec 后不要直接让 agent "开始实现"——一个 spec 往往含多个方向（数据结构、运行时、UI、测试、文档、验证脚本），一次全做容易互相牵扯。
 
 ```
-$to-issues .scratch/<project>/prd-v0.md
+$to-tickets .scratch/<project>/spec-v0.md
 ```
 
-- 目标：每个任务能独立领取、独立验证、独立交付
-- 合理粒度：一个 issue 在一个明确上下文里完成一个可验证的垂直切片
+- 目标：每个 ticket 能独立领取、独立验证、独立交付
+- 合理粒度：一个 ticket 在一个明确上下文里完成一个可验证的垂直切片
 - 拆太粗 → agent 自由发挥；拆太细 → 制造协调成本
 
 ### 4.4 不知道下一步 → `ask-matt`
 
-已有 PRD 和 issue 但不确定下一步该用 implement、tdd、review 还是 qa 时，不要靠猜。
+已有 spec 和 ticket 但不确定下一步该用 implement、tdd、review 还是 qa 时，不要靠猜。
 
 ```
 $ask-matt
-我现在有 PRD 和 5 个 issue，第一个 issue 涉及 ...。下一步应该怎么推进？
+我现在有 spec 和 5 个 ticket，第一个 ticket 涉及 ...。下一步应该怎么推进？
 ```
 
 - 价值是**流程路由**，不直接写代码，而是帮你选择更合适的工作方式
@@ -129,8 +129,8 @@ $ask-matt
 ```
 grill-with-docs
   → CONTEXT.md / ADR
-  → to-prd
-  → to-issues
+  → to-spec
+  → to-tickets
   → ask-matt
   → implement / superpowers
   → tdd
@@ -141,7 +141,7 @@ grill-with-docs
 **为什么看起来更慢反而更省**：它把最容易返工的部分提前暴露——目标、边界、非目标、验收标准、任务粒度。真正进入实现时，agent 上下文更稳定，执行更少跑偏。
 
 - superpowers 不放开头，放在 SpecCoding 资产准备好之后
-- 如果只是交付一个明确 issue，`implement` 可能比 superpowers 更轻
+- 如果只是交付一个明确 ticket，`implement` 可能比 superpowers 更轻
 
 ---
 
@@ -151,13 +151,13 @@ grill-with-docs
 
 | | 面向 | 适用 |
 |---|---|---|
-| `implement` | 交付 | 拿着 PRD 或 issue 做完一个任务（外层交付流程） |
+| `implement` | 交付 | 拿着 spec 或 ticket 做完一个任务（外层交付流程） |
 | `tdd` | 编码 | 行为边界清楚时用红绿重构推进（内层编码方法） |
 
 合理关系：
 
 ```
-PRD + 单个 issue
+spec + 单个 ticket
   → implement
   → 在适合的行为边界上使用 tdd
   → 编码
@@ -185,8 +185,8 @@ PRD + 单个 issue
 | 环节 | skill | 路径 |
 |------|-------|------|
 | 需求澄清 | `grill-with-docs` | `skills/dev/grill-with-docs/install_reference.md` |
-| 落 PRD | `to-prd` | `skills/dev/to-prd/install_reference.md` |
-| 拆 issue | `to-issues` | `skills/dev/to-issues/install_reference.md` |
+| 落 spec | `to-spec` | `github/mattpocock/skills/install_reference.md` |
+| 拆 ticket | `to-tickets` | `github/mattpocock/skills/install_reference.md` |
 | 流程路由 | `ask-matt` | `skills/dev/ask-matt/install_reference.md` |
 
 ### 8.2 执行期（superpowers — 本仓库已集成全部）
