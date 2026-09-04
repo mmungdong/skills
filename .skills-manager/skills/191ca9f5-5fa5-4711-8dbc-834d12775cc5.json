@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "191ca9f5-5fa5-4711-8dbc-834d12775cc5",
+  "path": "h3yun-login",
+  "path_key": "h3yun-login",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/h3yun-login",
+    "branch": null
+  }
+}
