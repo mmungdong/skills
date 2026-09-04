@@ -32,10 +32,11 @@ description: >-
 
 ## 前置：确保 `crwu` 可用
 
-`crwu` 是 Go 二进制，通常已装好（`which crwu` / `crwu version` 可验证）。若
-找不到（`command not found`），需先用本机 Go 从源码构建：源码在 skills 缓存
-仓库，如 `/Users/mungdong/.skills-manager/cache/repos/<repo>/`（含 `Makefile`），
-执行 `make build` 产出 `<repo>/bin/crwu`，后续用它或把 `bin/` 加入 PATH。
+`crwu` 是 Go 二进制，通常已随项目/环境装好（`which crwu` / `crwu version`
+可验证）。若**找不到**（`command not found`），**不要擅自改环境或自行从源码
+构建**——这属于部署/环境问题，应先**如实告知用户**："当前环境找不到 `crwu`
+命令"，并**询问用户**希望如何处理（例如由用户提供/安装该工具，或确认正确的
+调用路径）后再继续。技能纪律：遇到环境缺失如实转述、不擅自绕过或替用户做决定。
 
 ## 流程
 
