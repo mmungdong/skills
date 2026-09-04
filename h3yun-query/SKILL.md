@@ -3,9 +3,10 @@ name: h3yun-query
 description: >-
   当用户想【查/看/浏览/找/搜】氚云（H3Yun）的【系统/应用/表单/记录/数据/附件】，
   或说"我们有哪些系统""打开某系统看看下面有什么""这个表单里有什么记录""找标题含 X
-  的记录""下一页/第 N 条"时，自动使用本技能。流程：列系统→选系统→看表单→查记录
-  （每页 20 条、支持标题关键词）→可看记录详情/附件。只读。若提示无会话/会话过期，
-  先改用 h3yun-login；若是登录/绑定类请求不要使用本技能。
+的记录""下一页/第 N 条"或"筛状态/类型/日期符合条件的记录"时，自动使用本技能。
+  流程：列系统→选系统→看表单→查记录（每页 20 条、支持标题关键词与 --filter 字段
+  条件筛选）→可看记录详情/附件。只读。若提示无会话/会话过期，先改用 h3yun-login；
+  若是登录/绑定类请求不要使用本技能。
 ---
 
 # H3Yun 数据查询（h3yun-query）
@@ -32,6 +33,7 @@ description: >-
 - "打开 XX 系统，看看下面有哪些表单（子集）"
 - "在 XX 表单里看看有哪些记录 / 最近 20 条"
 - "帮我找标题/名称含 xxx 的记录"
+- "帮我筛状态/类型/所属时间段符合条件的记录"
 - "这条记录再往下一页 / 我要查第 N 条"
 
 ## 前置检查
@@ -79,13 +81,29 @@ crwu h3yun records list --schema <schemaCode> --size 20
 
 # 用户给出标题/关键词 → 直接按关键词查
 crwu h3yun records list --schema <schemaCode> --size 20 --keyword <标题关键词>
+
+# 用户给出字段条件（状态/类型/时间段等）→ 用 --filter
+crwu h3yun records list --schema <schemaCode> --size 20 --filter "Status = 1 and Name Contains '测试'"
+crwu h3yun records list --schema <schemaCode> --size 20 --filter "F0000036 Equal '国有企业'"
 ```
 
 - 行数据在 `data`（数组或 `data.returnData`）里；把每条整理成**一行简要**：
   `名称(Name/标题) · 单号(SeqNo 如有) · 更新时间(ModifiedTime) · ID 尾段`。
 - 翻页：`--page <n>`（从 1 开始），提示用户"下一页 20 条？"再执行
   `crwu h3yun records list --schema <code> --page 2 --size 20`。
-- 无结果：先如实告知，再建议换关键词或换表单/系统，不要猜 ID。
+- `--filter` 语法（SQL 风格、大小写不敏感，完整表见 `docs/cli-manual.md` §4）：
+  - 比较：`=`（或 `Equal`）、`!=`/`<>`（或 `NotEqual`）、`>`/`>=`/`<`/`<=`
+    （或 `Above/NotBelow/Below/NotAbove`）
+  - 文本：`Contains`（`Like` 同义，氚云没有 Like）、`StartWith`/`EndWith`
+    （可 `not` 取反）
+  - 集合/区间/空值：`In (a,b)`/`NotIn`、`Between '起' and '止'`、
+    `IsNull`/`IsNotNull`/`IsNone`/`NotNone`
+  - 组合：`and`/`or` 与括号
+  - **字段名用记录返回 JSON 的键**：标准字段 `Name/SeqNo/Status/CreatedTime/
+    ModifiedTime/OwnerId` 或业务字段 `F0000xxx`；拿不准先 `list` 一次看返回再筛。
+    字符串值必须加引号（`'测试'`），数字与 true/false 可不加引号，日期用
+    `'2026-09-04'` 或 `'2026-09-04 13:55:21'` 这类字符串。
+- 无结果：先如实告知，再建议放宽/更换条件、换关键词或换表单/系统，不要猜 ID。
 
 ### 第 4 步：查看用户选中记录的具体内容（简要输出）
 
@@ -137,6 +155,10 @@ crwu h3yun records get --schema <schemaCode> --id <ObjectId>
 用户：帮我找标题含"测试"的记录
 助手：crwu h3yun records list --schema <code> --keyword 测试 --size 20
       …
+用户：把状态是进行中、客户性质为国有企业的列出来
+助手：crwu h3yun records list --schema <code> --filter "Status = 1 and F0000036 Equal '国有企业'" --size 20
+      1. 润华有限公司 · KH7684 · 2026-09-04 · id…f23944c7
+      2. …
 ```
 
 ## 更多
