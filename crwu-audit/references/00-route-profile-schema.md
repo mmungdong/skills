@@ -45,6 +45,9 @@
     "methods": [ { "method": "市场法", "source": "附件名/待抽验", "confirmed": false } ],
     "base_date": "2026-07-31", "doc_no": "…", "legal_or_not": "法定评估业务",
     "regulatory_overlays": ["国资-国家国资委"],
+    "business_risk_class": { "class": "B", "hits": ["B5"], "unknown": [],
+                            "basis": "国企资产处置且名称含金额<500万", "rigor": "标准",
+                            "note": "严谨度参考；最终过否人工（判定见 references/03）" },
     "weak_structured": false,
     "material_gaps": [],
     "confidence": { "overall": "中", "note": "主线由字段直接命中；方法待抽验" }
