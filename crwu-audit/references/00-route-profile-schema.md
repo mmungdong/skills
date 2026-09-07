@@ -62,3 +62,20 @@
 - 字段直读 → 高；名称推理 → 中/低（须标 source=名称推断）；
 - 方法未确认前不得在分发结论中使用"已采用某法"的强表述；
 - 三条来源（字段/名称/附件名）冲突 → 交 02 冲突检测（ROUTE001–004）。
+
+## 5. 路由前置输入与文件级提取（增补）
+
+- **显性输入前置**：报告名称 F0000049、风险等级 F0000020（先验/一致性锚点，不直接采信）；
+- **文件级提取（路由阶段，不限字段）**：评估目的原文（比对 F0000064）、评估方法（读方法章节，附件名仅提示）；
+- **复杂度档**：对象=单项资产 → 常规流；对象=企业价值类（股东权益/企业资产负债/资产组合/资产组）→ 复杂流。
+
+```jsonc
+{ // route_profile 增补字段（与 §3 合并输出）
+  "inputs": { "report_name": "…", "risk_level_record": "C", "risk_level_source": "F0000020-先验/对照" },
+  "purpose_file": "为…提供价值参考（报告原文）",
+  "methods": [ { "method": "收益法", "source": "文件-方法章节", "confirmed": true } ],
+  "complexity": { "object_scope": "企业价值", "flow": "complex",
+                    "reason": "企业价值→需财务异常/方法专项/证据验证",
+                    "required_modules": ["financial-anomaly","income-approach","asset-approach","evidence-validation"] }
+}
+```
