@@ -25,7 +25,7 @@ description: >-
 ## 定位与触发
 - 何时用：待审材料含 `.xlsx/.xls`（评估明细表、市场法计算表、成本法汇总表、租金倒算表等），
   或叶子技能要求先跑表格勾稽（rent/realestate 的明细表分区必做步骤）。
-- 与知识库口径：对应 `M-数据校对`（`crwu-knowledge/audit-skill/03-模块-数据校对.md`）与
+- 与知识库口径：对应 `M-数据校对`（`~/.crwu/knowledge/audit-skill/03-模块-数据校对.md`）与
   `08-审核统计与台账规范.md` 的 `data_diff_count`；规则判断交回对象/方法技能。
 
 ## 前置与工具链（依赖说明）

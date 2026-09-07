@@ -30,7 +30,7 @@ description: >-
 ## 运行前检查
 
 1. 读 `KB/00-治理与规范/知识库大纲与进度总表.md` 与 `KB/00-治理与规范/待人工发布清单-不动产方向-2026-09.md`
-   （KB=`/Users/mungdong/code/github/mungdong/crwu-knowledge`）确认门禁：
+   （KB=`/Users/mungdong/.crwu/knowledge`）确认门禁：
    RULE-01-02-543~578 / 281~305 未发布 → **试点模式**（每条意见标 `[依据待发布]`）。
 2. 材料包：评估报告 + 评估说明 + 测算明细表（必需）；委托合同/权属证明/底稿（加分）。
    缺件先报告，不补全猜测。
