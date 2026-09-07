@@ -16,10 +16,10 @@ description: >-
 - `references/01-audit-angles-catalog.md` —— 受控审核角度词表（canonical，分发主键）
 - `references/02-overlay-rules.md` —— 监管覆盖层判定与冲突检测
 - `references/99-维护说明.md` —— **修改本族任何技能/本文档前必须先读**（分层地图/标准流程/红线）
-- 规则正文单一事实源在 crwu-knowledge；输出/统计/防幻觉 schema 以 KB `audit-skill/06/07/08` 为准
+- 本族自含分发逻辑与运行材料，**与知识库仓库解耦**：不预读知识库入口文档、不引用其路径；规则正文与输出/统计/防幻觉契约由部署环境在叶子执行时注入
 
 ## 1. 输入（两种来源）
-- ① 材料包（目录约定见 KB `audit-skill/01` §1）
+- ① 材料包（目录约定由部署环境注入）
 - ② 氚云「报告审核」记录（schema `Srabfcm8figc1xuzxawc5u04x5`，字段清单见 references/00）：
   读取记录全字段 + 附件文件名，按 references/00 产出画像，不依赖人工 manifest。
 
