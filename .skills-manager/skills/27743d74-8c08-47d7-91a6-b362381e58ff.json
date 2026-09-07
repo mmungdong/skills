@@ -7,7 +7,7 @@
   "tags": [],
   "source": {
     "type": "git",
-    "ref": "https://github.com/mmungdong/crwu-ai",
+    "ref": "https://gitee.com/mengdong123/crwu-ai",
     "subpath": "skills/crwu-audit",
     "branch": null
   }
