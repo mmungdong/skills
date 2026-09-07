@@ -68,12 +68,22 @@
 - **显性输入前置**：报告名称 F0000049、风险等级 F0000020（先验/一致性锚点，不直接采信）；
 - **文件级提取（路由阶段，不限字段）**：评估目的原文（比对 F0000064）、评估方法（读方法章节，附件名仅提示）；
 - **复杂度档**：对象=单项资产 → 常规流；对象=企业价值类（股东权益/企业资产负债/资产组合/资产组）→ 复杂流。
+- **方法必须分层记录**：`methods[]` = 报告**披露/采用的方法集合**（可为多个，逐一标注 role：
+  `采用-结论` / `测算-参考` / `并列采用`）；`conclusion_method` = **结论方法**（如 市场法）。
+  禁止把多方法压成单一"结论方法"——收益法等"测算未作结论"的方法仍要保留（其过程/测算表/差异分析
+  属审核范围）；附件文件名仅作提示，不作依据。
+- **多方法审核点（叶子方法专项执行）**：是否披露全部采用方法、是否说明结论方法选取理由、
+  两法结果差异是否分析（差异大须解释）、报告/说明/明细表方法口径是否统一。
 
 ```jsonc
 { // route_profile 增补字段（与 §3 合并输出）
   "inputs": { "report_name": "…", "risk_level_record": "C", "risk_level_source": "F0000020-先验/对照" },
   "purpose_file": "为…提供价值参考（报告原文）",
-  "methods": [ { "method": "收益法", "source": "文件-方法章节", "confirmed": true } ],
+  "methods": [
+      { "method": "市场法", "role": "采用-结论", "source": "文件-摘要/方法章节", "confirmed": true },
+      { "method": "收益法", "role": "测算-参考(未作结论)", "source": "文件-说明-收益法章节", "confirmed": true }
+    ],
+  "conclusion_method": "市场法",  // 结论方法：与 methods[] 中 role=采用-结论 对应
   "complexity": { "object_scope": "企业价值", "flow": "complex",
                     "reason": "企业价值→需财务异常/方法专项/证据验证",
                     "required_modules": ["financial-anomaly","income-approach","asset-approach","evidence-validation"] }
