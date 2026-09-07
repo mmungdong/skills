@@ -1,6 +1,6 @@
 # references/00 · 输入字段与 route_profile 画像 schema
 
-| 版本 | v0.2 | 状态 | 2026-09-07 更新（§6.1 脏数据剔除改「重建法」；坐标系规则与 raw 可见区例外） | 维护 | 改这里=输入/画像 schema 层；流程见 99 |
+| 版本 | v0.3 | 状态 | 2026-09-07 更新（§3 增 scenario 装配键，OPT-2026-09-07-02；§6.1 重建法与坐标系规则） | 维护 | 改这里=输入/画像 schema 层；流程见 99 |
 | --- | --- | --- | --- | --- |
 
 > 本文件是 crwu-audit 入口的第 0 层运行材料：说明"从氚云记录或材料包里能拿到什么、
@@ -30,7 +30,7 @@
 - 业务大类/目的为空（基线约 700 条）→ 必须读 `F0000049` 名称推理 canonical 角度；
 - 名称含混推不出 → 输出"画像歧义，需人工确认"，**不猜测分发**。
 
-## 3. route_profile 画像 schema（分发输入，JSON v0.1）
+## 3. route_profile 画像 schema（分发输入，JSON v0.2）
 
 每个字段带 `source`（字段 / 名称推断 / 附件名 / 材料抽验）与 `confidence`（高/中/低）。
 
@@ -42,6 +42,7 @@
                     "f64": "资产处置", "name_evidence": "拟处置…的市场价值评估" },
     "object": { "object_class": "设备类", "scope": "单项资产", "describe": "（F0000049 摘要）" },
     "value_type": "市场价值",
+    "scenario": "经营性物业出租",  // 装配键（必填）：KB dims.scenario 受控取值，见 references/01「KB scenario 装配键」列；来源=字段 F0000065×64 推导/名称推断
     "methods": [ { "method": "市场法", "source": "附件名/待抽验", "confirmed": false } ],
     "base_date": "2026-07-31", "doc_no": "…", "legal_or_not": "法定评估业务",
     "regulatory_overlays": ["国资-国家国资委"],
@@ -57,6 +58,11 @@
                 "kb_ready": false }
 }
 ```
+
+> **装配纪律（必读）**：`scenario` 为**必填装配键**，取值=references/01「KB scenario 装配键」列的受控值。
+> 缺键或只按方法装配 → `kb_tool.py assemble` 场景筛选静默失效（dims_hit：profile 未给键=不过滤，
+> 无 error/warn），命中清单无法证明"目的/场景已核"（OPT-2026-09-07-02 E1/E2：CHK-003 等场景化条目
+> 会无条件命中或被误排而不自知）。scenario 须与 `methods` 一并传入装配 profile。
 
 ## 4. 置信度与来源标注规则
 - 字段直读 → 高；名称推理 → 中/低（须标 source=名称推断）；
