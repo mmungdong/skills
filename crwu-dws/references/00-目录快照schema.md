@@ -12,7 +12,7 @@
 - M2：收尾写入 `knowledge/.crwu-directory.json`（案例副本，同 schema）。
 - M3：node-index 的数据源（快照更新后重建索引，见 references/02）。
 
-**内容红线**：本 schema 只承载目录元数据；任何正文内容（文档正文/单元格/附件内容）不属于本文件及本缓存层（references/02 §4）。
+**内容红线**：本 schema 只承载目录元数据；任何正文内容（文档正文/单元格/附件内容）不属于本文件及本缓存层（红线：references/02 §1.2 正文不缓存）。
 
 ## 2. 快照 JSON schema（`crwu.kb-catalog.snapshot.v1`）
 
@@ -80,13 +80,14 @@
 
 - M1：`命中 <n> 库` → 每库一行：`<库名>（<spaceType>）workspaceId=<…>：节点 <total>/folder <folders>/深度 <max>，缓存 <绝对路径>（fetched_at=<…>）`；failures 非空附"部分失败"清单；`complete=false` 显式"目录未完整（缓存未更新）"。
 - M2：`knowledge/ 更新：成功 N / 跳过 S / 失败 F`，失败逐项一行；附"远端已不存在（本地保留）"条数；**附镜像时点**："本镜像 = <exportedAt> 快照，仅供本案参考；需最新请重跑或 M3 单篇拉取"。
-- M3：见 references/02 §5 报告口径。
+- M3：见 references/02 §6 报告口径。
 - 全部产物给出绝对路径。
 
 ## 6. 命名与落盘（M1 = 目录缓存层，v0.3 起）
 
 - 缓存根：`~/.crwu/knowledge/dws-dir-cache/`（**与 CRWU_KB_ROOT=knowledge-base 子树同级隔离**；kb_tool 不扫描此层；此层不是事实源）。
 - 每库子目录：`dws-dir-cache/<精确库名>/`；库名清洗非法字符 `\/:*?"<>|` 与首尾空白（空 → workspaceId）；同名不同 spaceType 多库 → 子目录追加 `-<spaceType>`。
-- 文件：`目录快照.json`、`目录树.md`、`node-index.json`（references/02 §2）、`.cache-meta.json`（references/02 §3）。
+- 文件：`目录快照.json`、`目录树.md`、`node-index.json`（references/02 §3 schema）、`.cache-meta.json`（references/02 §3 schema；身份语义见 §2）。
+- 缓存身份与清理：缓存目录身份 = `.cache-meta.json.space`（name+workspaceId，真实返回）；身份与目标库名不一致 → 目录被清理层整体删除后在线重下（references/02 §2 / SKILL.md §5.0）。
 - **原子替换**：先写 `.tmp-*` 再 rename 覆盖；写失败不得留下半截"正式"文件（宁可保留旧缓存并在 meta 说明）。
 - 旧落点 `~/.crwu/kb-catalog/`（v0.1/0.2）：不再写入；既有文件保留待人工清理，本技能不迁移不删除。
