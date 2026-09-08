@@ -79,4 +79,4 @@
 ## 6. 边界与口径（v0.3 补强）
 
 - **正文永不进入目录缓存层**：M2 产物只落在案例 `knowledge/`；禁止把镜像内容复制到 `~/.crwu/knowledge/dws-dir-cache/`（或任何"缓存"语义目录）充当可复用正文来源——正文复用即过期（红线 D9）。
-- 口径：案例 `knowledge/` = 本案推理实时参考（案例期）；`CRWU_KB_ROOT=~/.crwu/knowledge/knowledge-base` = 发布/门禁基准；目录缓存 = 查找加速（无正文）。读取优先级由 crwu-audit 族维护（走 crwu-audit-optimize 流程登记）；本规范不预改写 audit 文件；本清单 + `.crwu-directory.json` 是"本次镜像内容与证据"的追溯入口。
+- 口径：案例 `knowledge/`（本次下载物）= 本次审核实时参考（下载时刻=最新；文件零缓存）；知识库正文**无发布/试点门禁**（口径 2026-09-08：文档即权威、下载即审；`CRWU_KB_ROOT` 静态根仅维护/离线归档、不冒充实时）；目录缓存 = 查找加速（无正文）。本清单 + `.crwu-directory.json` 是本次下载内容与证据的追溯入口。
