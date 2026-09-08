@@ -2,10 +2,12 @@
 name: crwu-dws
 description: >-
   中瑞世联 AI 测试知识库（钉钉 wiki）【只读域】技能：M1 查询/导出该知识库（按精确库名解析
-  组织+个人全范围，多命中全导）的完整层级目录（聊天摘要+目录树+JSON 快照，带分页证据）；
-  M2 把 crwu-audit 及子 skill 推理时依赖的参考知识文档按库内目录结构批量导出
-  （adoc→markdown 正文）到与源审核数据文件同级的案例目录 knowledge/ 下，供审核实时参考
-  （员工在钉钉更新 → AI 取到最新版）。对钉钉零写操作。泛化钉钉知识库/doc 管理走
+  组织+个人全范围，多命中全导）的完整层级目录，并缓存目录/索引到本地 ~/.crwu/knowledge
+  的 dws-dir-cache 下；M2 把 crwu-audit 及子 skill 推理时依赖的参考知识文档按库结构批量导出
+  （adoc→markdown）到与源审核数据文件同级的案例目录 knowledge/ 下（案例期快照）；
+  M3 缓存兜底查找：按文件名或 nodeId 先查本地目录缓存，未命中自动刷新缓存后再查，仍无则
+  如实报告"没找到"；正文一律实时从钉钉导出（临时取用即弃、永不落缓存，保证最新）。
+  缓存原则：目录可缓存、正文不缓存。对钉钉零写操作。泛化钉钉知识库/doc 管理走
   dingtalk-wiki/dingtalk-doc；本地 CRWU_KB_ROOT/kb_tool、审核意见不属本技能。
   命令前缀：dws wiki / dws doc。设计见 docs/design-crwu-dws.md。
 metadata:
@@ -16,96 +18,87 @@ metadata:
       - dws
 ---
 
-# crwu-dws（钉钉知识库只读域：M1 目录查询 / M2 知识文档批量下载）
+# crwu-dws（钉钉知识库只读域：M1 目录查询+缓存 / M2 案例镜像 / M3 缓存兜底查找）
 
 ## 0. 目录结构与加载
-- `SKILL.md`（本文件，入口；双模式流程 + 只读白名单）
-- `references/00-目录快照schema.md` —— 快照 JSON schema / 字段语义 / 渲染规则（M1/M2 共用）
-- `references/01-镜像与manifest规范.md` —— M2 落盘布局 / 命名冲突 / manifest JSONL / 幂等与残留语义
-- 改前必读 `docs/design-crwu-dws.md`（§10 决策点）；改动按仓库纪律源仓+运行时 `~/.dsh/skills` 双份同步（diff -r 为空）
+- `SKILL.md`（本文件，入口；三模式流程 + 缓存语义 + 只读白名单）
+- `references/00-目录快照schema.md` —— 快照 schema / 字段语义 / 渲染规则（M1/M2/M3 共用）
+- `references/01-镜像与manifest规范.md` —— M2 案例镜像布局 / manifest / 幂等与残留语义
+- `references/02-缓存与兜底查找规范.md` —— 目录缓存布局 / node-index / M3 查找与刷新协议 / 正文不落缓存红线
+- 改前必读 `docs/design-crwu-dws.md`（§10 决策点 D8–D11）；改动按仓库纪律源仓+运行时 `~/.dsh/skills` 双份同步（diff -r 为空）
 
 ## 1. 触发与模式消歧
 
 | 用户意图（例） | 模式 | 主要产物 |
 | --- | --- | --- |
-| "看/查/列 中瑞世联 AI 测试知识库 的 目录/层级/树/结构"、"某文档在哪个目录" | **M1 目录查询** | 摘要 + `目录树.md` + `目录快照.json` → `~/.crwu/kb-catalog/<精确库名>/` |
-| "下载/同步/镜像 知识文档到本次审核材料旁"、"要最新/实时参考文档（knowledge）" | **M2 批量下载** | `<案例目录>/knowledge/` 镜像 + `.crwu-manifest.jsonl` + `.crwu-directory.json` |
+| "看/查/列 中瑞世联 AI 测试知识库 的 目录/层级/树/结构" | **M1 目录查询** | 摘要 + 目录缓存（`~/.crwu/knowledge/dws-dir-cache/<库名>/`：`目录快照.json`/`目录树.md`/`node-index.json`/`.cache-meta.json`） |
+| "下载/同步/镜像 知识文档到本次审核材料旁"（案例参考） | **M2 批量下载** | `<案例目录>/knowledge/` 案例镜像 + `.crwu-manifest.jsonl` + `.crwu-directory.json` |
+| "找/查 文件 XX（在不在库里、哪个目录）"、"nodeId … 是什么"、"取 XX 最新内容" | **M3 缓存兜底查找** | 命中：元数据+树路径（要正文 → 现场实时拉取、用后即弃）；未命中→刷新→仍无："未找到"报告 |
 
-- 目标库名默认固定「中瑞世联 AI 测试知识库」；用户显式给出其他库名时按同流程处理（流程与产物不变，产物目录以实际库名为准）。
-- **不触发**：泛化钉钉知识库/doc 管理（→ `dingtalk-wiki` / `dingtalk-doc`）；本地 `~/.crwu/knowledge/knowledge-base` 规则查询或 kb_tool 操作（→ 对应本地工具/部署）；审核报告材料本身（→ `crwu-audit`）。
-- M2 通常由 crwu-audit 编排者在审核前调用（给 AI 装实时参考）；也可独立按需调用。
+- 目标库名默认「中瑞世联 AI 测试知识库」；其他库名同流程处理（产物目录以实际库名为准）。
+- **不触发**：泛化钉钉知识库/doc 管理（→ `dingtalk-wiki`/`dingtalk-doc`）；CRWU_KB_ROOT 规则查询/kb_tool（→ 本地工具/部署）；审核报告材料（→ `crwu-audit`）。
+- M2 通常由 crwu-audit 编排者在审核前调用；M3 供 skill（audit 族等）推理时取参考文档，也可对用户直接服务。
 
 ## 2. 执行契约（dws 最小集）
-- 只通过 `dws` CLI；结构化读取用 `--format json`，按真实返回判断；已知命令直接执行，只有 leaf 参数/flag 不确定时读一次精确 Schema/Help；不加载产品级 Catalog 选路。
+- 只通过 `dws` CLI；结构化读取用 `--format json`，按真实返回判断；已知命令直接执行，只有 leaf 参数/flag 不确定时读一次精确 Schema/Help；不加载产品级 Catalog。
 - 不猜命令、flag、字段、ID、名称；后续 ID 必须来自真实返回；解析/读取/导出全程同一 profile（多账号只用 `isOrgCurrent=true` 默认账号或用户明确指定）。
-- 不输出或记录 token 等凭据；认证/权限/profile/未知错误 → 只读 `dingtalk-shared` 对应 reference，不连续猜测。
-- 时间戳面向用户时转当前时区可读时间。
-- **对钉钉零写（硬白名单）**：wiki 域仅允许 `space-list/space-search/space-get/node-list/node-search/node-get`；doc 域仅允许 `+export`（远端只读、产物落本地）。**禁止** wiki `+space-create/+node-create/+node-copy/+move/+move-to-drive/+node-delete/+member-*/+feed` 及 doc 一切写命令——本技能任何情况不执行。
-- 本技能唯一的"写" = 本地产物文件（M1 快照 / M2 镜像），均按用户意图落盘。
+- 不输出或记录 token 等凭据；认证/权限/profile/未知错误 → 只读 `dingtalk-shared` 对应 reference，不连续猜测；时间戳面向用户时转当前时区。
+- **对钉钉零写（硬白名单）**：wiki 域仅 `space-list/space-search/space-get/node-list/node-search/node-get`；doc 域仅 `+export`（远端只读、产物落本地）。禁止其余一切命令。
+- 本技能唯一的"写" = 本地：① 目录缓存（M1/M3 刷新）② 案例镜像（M2）③ 临时区（正文实时取用，用后即弃）。**正文永不写入目录缓存**（红线 §6.3 / references/02）。
 
-## 3. P1 库解析（M1/M2 共用，只读）
-1. 确认 profile；M2 额外先确认案例目录（§6.1）。
-2. 分范围全量取空间并**精确名匹配**：
-   `dws wiki +space-list --type orgWikiSpace --limit 50 --page-all --format json`；
-   `dws wiki +space-list --type myWikiSpace --limit 50 --page-all --format json`。
-   （`+space-search` 只作候选浏览，不作唯一性证据。）
-3. 判据（dingtalk-wiki 语义）：
-   - 列表顶层 `requestedType` 必须等于本次请求范围；`autoPageComplete=true` 才可用"缺席"证无；
-   - 命中 0 → 报告扫描范围 + 分页完成证据 + 相似候选名（若有），**不编造**；可询问是否换名/换范围再跑；
-   - 命中 ≥1 → **全部**进入处理列表，各自保留真实 `workspaceId`、`spaceType`（只取服务端真实返回）与来源范围标注；不合并、不猜唯一。
+## 3. P1 库解析（三模式共用，只读）
+1. 确认 profile；M2 额外确认案例目录（§6.1）；M3 输入为 精确文件名 或 nodeId（用户/调用方给出，不猜近似）。
+2. 分范围全量取空间并精确名匹配：`dws wiki +space-list --type orgWikiSpace|myWikiSpace --limit 50 --page-all --format json`（`+space-search` 仅候选浏览，不作唯一性证据）。
+3. 判据：`requestedType` 与请求范围一致；`autoPageComplete=true` 才可用"缺席"证无；命中 0 → 报告范围+相似候选，不编造；命中 ≥1 → 全部进入处理列表，保留真实 `workspaceId/spaceType`（只取服务端真实返回）与范围标注。
 
-## 4. P2 目录遍历（M1/M2 共用，只读，DFS 递归）
-1. 根层：`dws wiki +node-list --workspace <workspaceId> --page-all --format json`（不带 `--folder`）。
-2. 对返回中 `type=folder` 的节点递归：`dws wiki +node-list --workspace <workspaceId> --folder <folderId> --page-all --format json`，直至无 folder。
-3. 纪律：
-   - 每层记录分页证据（`autoPageComplete/pagesFetched/条目数`）并写入快照；
-   - `hasChildren`/`extension.hasChildren` 仅作提示，**不作剪枝依据**（防服务端元数据滞后漏枝）；
-   - folder 按 nodeId 去重：同一 folder 第二次展开即停止该支并标注"异常环/重复"；
-   - 节点字段（nodeId/名称/type/parentFolderId/hasChildren）只取真实返回；未知 type 原样保留，不归类不猜测；
-   - 体量防护：节点总数 > 10,000 或深度 > 20 → **停止**，如实报告部分结果与原因（不宣称全量）。
-4. 遍历结果 = 内存树（前序展开序），M1/M2 共用同一棵树做产物。
+## 4. P2 目录遍历（三模式共用，只读，DFS 递归）
+1. 根层 `dws wiki +node-list --workspace <ID> --page-all --format json`；对 `type=folder` 递归 `--folder <folderId> --page-all`，直至无 folder。
+2. 纪律：每层记录分页证据并写入快照；`hasChildren` 仅提示不作剪枝；folder 按 nodeId 去重（二次展开停+标注）；节点字段只取真实返回，未知 type 原样保留；体量上限 10,000 节点 / 20 层 → 停止并如实报告部分结果。
+3. 遍历结果 = 内存树（前序展开序）；任何一次**成功完整遍历**都更新目录缓存（P3-M1 原子替换）。
 
-## 5. P3-M1 目录查询产物
-1. 快照 JSON：按 `references/00` schema（`crwu.kb-catalog.snapshot.v1`），含 space 元数据与证据、nodes（children 嵌套或平铺+depth，按 00 定稿）、failures。
-2. `目录树.md`：缩进树 + 行尾类型标注（folder 标 `[F]`，文档标 adoc/axls/…）；库头附 库名/workspaceId/spaceType/扫取时间/统计。
-3. 落盘目录：`~/.crwu/kb-catalog/<精确库名>/`（库名含路径非法字符时清洗，规则见 references/01 §2 命名口径）；已存在则覆盖写。
-4. 聊天摘要：命中库数；每库 总节点/folder 数/最大深度/产物路径；failures 非空时附结构化失败清单。
+## 5. P3-M1 目录查询 → 写缓存
+1. 组快照/树/索引：`目录快照.json`（references/00 schema，含 space 元数据、evidence、failures）、`目录树.md`、`node-index.json`（references/02 §2）。
+2. 落盘：`~/.crwu/knowledge/dws-dir-cache/<库名>/`；**原子替换**——先写 `.tmp-*` 再 rename 覆盖（防半截缓存）；目录不存在则创建（父目录知识根只读不可写时报告路径问题，不静默改落点）。
+3. 更新 `.cache-meta.json`：`{schema:"crwu.kb-dir-cache.meta.v1", space:{name,workspaceId,spaceType}, last_successful_at, source:"dingtalk-live", stats, evidence}`。
+4. 聊天摘要：命中库数、每库 节点/folder/深度/缓存路径；failures 非空附清单；`complete=false` 不写缓存、不宣称全量（保留旧缓存并在摘要说明"缓存未更新：遍历不完整"）。
 
-## 6. P3-M2 批量下载（镜像；远端只读 + 本地写）
-
+## 6. P3-M2 批量下载（案例镜像；远端只读 + 本地写）
 ### 6.1 目标目录决议（禁止猜）
-`knowledge/` 的父目录 = **案例目录**（= crwu-audit 源审核数据文件所在目录的**父级**，二者同级）。决议顺序：
-1. 编排者/用户在对话中显式给出案例目录路径 → 用之；
-2. 部署环境注入的案例目录变量（当前约定名 `CRWU_CASE_DIR`；若注入的是材料包目录则取其父级）→ 用之；
-3. 都没有 → **询问用户**案例目录路径，禁止随意落盘。
-（M2 由审核编排触发时通常路径已随材料包目录一并注入。）
+`knowledge/` 的父目录 = 案例目录（= crwu-audit 源审核数据文件所在目录的父级，二者同级）：① 编排者/用户显式给出；② 部署约定 `CRWU_CASE_DIR`（若注入的是材料包目录则取其父级）；③ 都没有 → 询问用户。
 
-### 6.2 下载执行
-1. 在案例目录下建 `knowledge/`；按 §4 内存树**镜像 folder 结构**为本地同名子目录（目录名/文件名清洗非法字符 `\/:*?"<>|` 与首尾空白；冲突/空名追加 `-<nodeId前8>`）。
-2. 对每个 adoc 节点（串行、不并发）：`dws doc +export --node <nodeId> --export-format markdown`（cwd = 案例目录；导出到临时区防同名覆盖），回执含 `localPath` 且 `sizeBytes>0` 即**终态**（不二次 ls/stat 验证）；随后把该文件移动为规范路径 `<folder路径>/<节点名>.md`：
-   - 与 manifest 已有登记比对：同 nodeId → 原位覆盖（=内容更新）；不同 nodeId 同名文件 → 本节点追加 `-<nodeId前8>` 后缀；
-   - 移动是纯本地操作，移动后不额外 stat（以 +export 回执为终态证据，规范路径记入 manifest）。
-3. 结果记账（写入 `.crwu-manifest.jsonl`，schema 见 references/01）：
-   - 成功 → entry：`{nodeId, name, type:"adoc", folderPath, localPath, exportedAt, evidence{export{localPath,sizeBytes}}}`；
-   - 失败 → failures 追加 `{nodeId, name, error}`，**继续后续节点不中断整批**；认证/权限/profile 类系统性错误 → 停止整批，读 `dingtalk-shared` 对应 reference；
-   - 非 adoc 非 folder 节点（axls/able/appt/adraw/amind/未知）→ skipped 追加 `{nodeId, name, type, reason:"v0.1 不下载该类型正文"}`，如实报告。
-4. 收尾写入：`.crwu-directory.json` = 本库目录快照（references/00 schema，含 evidence/failures）；manifest 写入模式标识与 space 信息。
-5. 远端已删除文档：本地保留旧文件，摘要列出"远端已不存在（本地保留，待人工清理）"清单；**不自动删除**。
-6. 摘要：成功 N / 跳过 S / 失败 F（+每项一行原因）与目录树统计核对；产物路径（`<案例目录>/knowledge/`）。
+### 6.2 下载执行（同 v0.2，语义补注）
+1. 建 `<案例目录>/knowledge/`，镜像 folder 结构为本地目录（清洗非法字符，冲突加 `-<nodeId前8>`）。
+2. 逐 adoc 节点（串行）：`dws doc +export --node <nodeId> --export-format markdown`，回执 `localPath`+`sizeBytes>0` 即终态；移动为规范路径 `<folder路径>/<节点名>.md`（同 nodeId 原位覆盖=更新；不同 nodeId 同名加后缀）。
+3. 记账 `.crwu-manifest.jsonl`（entry/skipped/failure；每行含 exportedAt）；失败继续不中断（认证类系统性失败 → 停止，读 dingtalk-shared）。
+4. 收尾写入 `.crwu-directory.json`（目录快照副本）；远端已删 → 本地保留+清单，不自动删除。
+5. **语义**：该镜像 = `<导出时点>` 的案例期快照，**仅供本案参考**；需要再最新 → 重跑 M2 或单篇走 M3；镜像文件与正文**禁止**写入 `~/.crwu/knowledge/dws-dir-cache`。
 
-## 7. P4 一致性自查
-- M1：快照节点计数 == 遍历完成计数（失败分支如实减除）；不一致 → 不宣称全量并附证据。
-- M2：成功+跳过+失败 == 目录树中 folder/adoc 相关节点数；manifest 可复跑（重跑全量覆盖、幂等、条目稳定）；不满足 → 不宣称完成，附部分结果与证据。
+## 7. P3-M3 缓存兜底查找（目录可缓存 / 正文实时 / 未命中刷新）
+输入：精确文件名 或 nodeId。
+1. **查缓存**：读 `<缓存>/node-index.json`（nodeId → 条目；名称 → 条目列表）：
+   - 命中 → 报告：条目元数据（type/parentFolderId/所在库）+ **树路径上下文**（顶层 folder 链），结论标注"缓存命中（fetched_at=<…>）"；不发起在线遍历；
+   - 名称多命中 → 全部列出路径上下文，请调用方/用户消歧（不猜）；
+   - 缓存缺失/损坏（JSON 解析失败等）→ 视为未命中，进入刷新。
+2. **未命中 → 刷新缓存**：重跑 P1+P2 在线全量遍历 → 原子更新缓存（§5 同款）→ **重查索引**。
+3. **刷新后仍未命中 → 报告**："未找到：<名称/nodeId>（目录已刷新至 <时间> 后仍不存在）"+ 名称相近候选（≤5 条，来自新快照），**不编造、不猜测近似即命中**。
+4. **命中且调用方要正文** → 现场实时拉取：`dws doc +export` 到**临时区**（系统临时目录或调用方指定临时目录），交付/读取后**用后即弃**；只有用户明确要求留档时才落到案例 `knowledge/`（按 M2 单篇语义登记 manifest）；**正文任何情况下不写入目录缓存与 CRWU_KB_ROOT**。
+5. **刷新失败降级**：在线遍历失败（认证/网络/分页未完成）→ 旧缓存可用：用旧缓存作答并显式标注"**缓存可能过期（fetched_at=<…>），刷新失败：<原因>**"；无旧缓存 → 报告"无法确认（缓存缺失且在线刷新失败）"。
 
-## 8. 边界与纪律
-- 结果只读自钉钉、不推断：缺 type/父子/导出回执字段 → 如实标注"服务端未返回/未取得"；
-- 目录快照与正文内容是**企业数据**：产物路径按约定落盘，不向第三方外传；
-- 口径：案例 `knowledge/` = crwu-audit 推理**实时参考**；`~/.crwu/knowledge/knowledge-base`（CRWU_KB_ROOT）= **发布/门禁基准**；两者差异由人工/复核判定（本技能不合并、不互相覆盖）；
-- 变更登记纪律：改本技能需同步运行时拷贝并在 `docs/CHANGELOG.md` 记纪要（无 crwu CLI 命令变更时也记 docs 条目）。
+## 8. P4 一致性自查
+- M1/M3 刷新：快照节点计数 == 遍历完成计数且 `failures=[]` 才写缓存/宣称全量；缓存 meta 与快照 fetched_at 一致。
+- M2：成功+跳过+失败 == folder/adoc 相关节点数；manifest 幂等可复跑。
+- M3 报告：必须带结论依据标签（缓存命中/刷新后命中/刷新后仍无/降级可能过期/无法确认），禁止无来源结论。
 
-## 9. 错误最短路径
-1. 空响应/缺失集合/分页未完成：停止后续并返回证据；不拿 `+space-search` 首页唯一候选断言。
-2. 认证/权限/profile 错：只读 `dingtalk-shared` 对应 reference（wiki/doc 分册）；不重试猜测命令。
-3. 单个节点导出失败：记 failures 继续；系统性失败（连续 >10 或认证类）→ 停止，报告已得部分。
-4. 未知 flag/命令：只查当前 leaf Help / 一次 shortcut 清单；不跨产品试探近似命令。
-5. 目标目录不可写/不存在父目录：报告路径问题并请用户给可写路径；不静默改落点。
+## 9. 边界与纪律
+- 结果只读自钉钉、不推断；目录/正文是**企业数据**：产物按约定落盘，不外传。
+- **红线（用户口径）**：目录可缓存、**正文不缓存**——`~/.crwu/knowledge` 下任何目录（含 dws-dir-cache、knowledge-base）不得出现正文导出副本作为可复用来源；每次取正文 = 现场导出（实时）。
+- 口径：案例 `knowledge/` = 本案实时参考；`CRWU_KB_ROOT` = 发布/门禁基准；目录缓存 = 查找加速（无正文）。差异由人工/复核判定。
+- 变更登记纪律：同步运行时拷贝 + `docs/CHANGELOG.md` 纪要。
+
+## 10. 错误最短路径
+1. 空响应/缺失集合/分页未完成：停止后续并返回证据；不拿 `+space-search` 首页候选断言。
+2. 认证/权限/profile 错：读 `dingtalk-shared` 对应 reference；不重试猜测命令。
+3. M2 单节点导出失败：记 failures 继续；系统性（连续 >10 或认证类）→ 停止报告已得部分。
+4. M3 缓存损坏/缺失：按 §7.1 视为未命中自动刷新；刷新也失败 → §7.5 降级，不假装权威。
+5. 缓存目录不可写：报告路径问题请用户处理；不静默改落点、不把正文改存他处以绕过红线。
+6. 未知 flag/命令：只查当前 leaf Help/一次 shortcut 清单；不跨产品试探。
