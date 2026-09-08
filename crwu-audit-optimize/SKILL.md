@@ -56,8 +56,8 @@ description: >-
    - `kb_tool.py assemble --profile <画像.json>` → 命中/排除（含原因）；
    - `kb_tool.py query / resolve / extract` → 库内现有 RULE/CHK 段及段落原文；
    - `kb_tool.py validate --skill-root <源仓 skills> --skill-root <运行时真身 skills>` → 漂移线索
-     （validate 含"三不写" lint：禁知识库名称 / 禁本地静态根路径字面 / 禁 nodeId 常量；引用路径存在性
-     校验为过渡双轨——本地静态根 OR crwu-dws 目录快照，推理/回归引用一律以实时下载为准）。
+     （validate 含"三不写" lint：禁知识库名称 / 禁本地正文路径字面 / 禁 nodeId 常量；引用路径存在性
+     由 crwu-dws 目录快照核对，推理/回归正文一律从钉钉实时下载）。
 5. 人工对照（知识库治理/目录文件经 crwu-dws 按库内层级路径实时下载后只读核对）：
    `00-总纲/目录地图.md`（画像→目录）、叶子 `references/00-KB装配表.md`（技能→知识库寻址键）、
    `00-总纲/治理/回测报告-真实案例覆盖.md` 与 `00-总纲/治理/校准案例记录.md`（案例 A/B 已覆盖点）、
@@ -93,8 +93,8 @@ description: >-
    涉及知识库规则文件的改动同步更新批次 README/进度总表对应行；
 4. 校验回归（**全过才算完成**）：
    - 凡改动过知识库任何 md（正文编辑/新增/改名/移动）→ 先 `kb_tool.py index`，再 `validate`
-     （源仓 skills / 运行时真身 skills）error=0（validate 含"三不写" lint：禁知识库名称 / 禁本地静态
-     根路径字面 / 禁 nodeId 常量）；索引时间须晚于本次知识库变更；
+     （源仓 skills / 运行时真身 skills）error=0（validate 含"三不写" lint：禁知识库名称 / 禁本地
+     正文路径字面 / 禁 nodeId 常量）；索引时间须晚于本次知识库变更；
    - 受影响装配示例（含本单画像）两跑 `diff` 为空（可复现）；
    - 案例回归：BG8169 / 300673 输出不劣化；
 5. 汇报：文件级改动清单 / 校验与回归结果 / 剩余风险与待办。
