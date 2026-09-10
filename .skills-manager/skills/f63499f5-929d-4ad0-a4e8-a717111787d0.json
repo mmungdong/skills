@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "f63499f5-929d-4ad0-a4e8-a717111787d0",
+  "path": "crwu-audit-asset-realestate",
+  "path_key": "crwu-audit-asset-realestate",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-asset-realestate",
+    "branch": null
+  }
+}

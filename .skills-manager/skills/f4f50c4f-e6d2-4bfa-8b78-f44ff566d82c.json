@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "f4f50c4f-e6d2-4bfa-8b78-f44ff566d82c",
+  "path": "crwu-audit-public-general-standards",
+  "path_key": "crwu-audit-public-general-standards",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-public-general-standards",
+    "branch": null
+  }
+}

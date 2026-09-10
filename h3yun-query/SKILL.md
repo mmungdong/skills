@@ -45,7 +45,8 @@ description: >-
    - 成功：输出里出现 `engineCode` 与 `expiresIn`，继续。
    - 失败/提示 no session：**不要猜测或索取 token**，请用户执行
      `crwu h3yun session bind --token '<JWT>'`（浏览器 DevTools 复制）后再来。
-2. 命令前缀：直接可用 `crwu`；在仓库内也可用 `./bin/crwu`。
+2. 命令前缀：直接可用 `crwu`；在仓库内也可用构建产物（macOS
+   `./bin/darwin/crwu`，Windows `./bin/windows/crwu.exe`）。
 
 ## 主流程（一次只问一个问题）
 

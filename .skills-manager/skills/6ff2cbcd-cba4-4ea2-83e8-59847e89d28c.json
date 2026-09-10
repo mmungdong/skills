@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "6ff2cbcd-cba4-4ea2-83e8-59847e89d28c",
+  "path": "crwu-audit-biz-financing-debt",
+  "path_key": "crwu-audit-biz-financing-debt",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-biz-financing-debt",
+    "branch": null
+  }
+}
