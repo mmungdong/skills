@@ -3,5 +3,10 @@
   "scenario_id": "bacc1cfe-a435-4715-93cd-7ea9f74c4529",
   "skill_id": "0a04770e-2f15-41c4-bb2d-b2f689f37407",
   "sort_order": 18,
-  "tools": {}
+  "tools": {
+    "codebuddy": true,
+    "deepseek_harness": true,
+    "opencode": true,
+    "workbuddy": true
+  }
 }
