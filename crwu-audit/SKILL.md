@@ -45,7 +45,7 @@ description: Use when routing or orchestrating report audits from a material pac
 ## 路由流程
 
 1. **定位与一次取数**：按输入类型定位唯一记录；记录型输入只 fetch 一次全字段。随后执行 `crwu h3yun files list --schema <code> --id <ObjectId>`，只取得附件字段、文件名、类型、大小和下载 URL 等元数据并分类；附件名只用于隔离决策和待抽验提示。
-2. **阶段一安全下载门禁**：先把一至四级复核意见、质控意见、底稿/在线底稿意见、外审意见、答复文件等归为复核记录。只有部署环境提供经验证的单附件/allowlist 下载能力，或用户已经提供确认隔离的源材料包，才继续准备报告、评估说明和测算材料。当前 `crwu h3yun file download --schema <code> --id <ObjectId> --out <dir>` 会下载整条记录的全部附件，阶段一禁止调用；如果只有该命令且记录含复核附件，立即停止并记录 capability gap，绝不能先整单下载再隔离或让模型接触复核正文。**被排除的复核件必须落盘《阶段一排除清单》**（`排除清单.json`：`[{fileId,name,sizeBytes}]`），供阶段二按 `scripts/fetch_review_records.py --manifest 排除清单.json` 定向取回——取回只认该清单、落 `复核-人工/`、禁写 `材料-源/`、逐件校验字节数（闭环，防越权取件）。
+2. **阶段一安全下载门禁**：先把一至四级复核意见、质控意见、底稿/在线底稿意见、外审意见、答复文件等归为复核记录。源材料**只按单附件定向下载**取回：`crwu h3yun file get --id <FileId> --out <材料-源/…>` 逐件下载源材料附件（FileId 来自步骤 1 的 `files list` 元数据）；**复核件绝不下载、绝不进入阶段一工作集**——只在《阶段一排除清单》记元数据。`crwu h3yun file download`（整单）阶段一**禁止调用**。若部署无 `file get` 命令、或记录含无法可靠区分源材料/复核件的附件，立即停止并记录 capability gap，绝不能整单下载后隔离、绝不能接触复核正文。**被排除的复核件必须落盘《阶段一排除清单》**（`排除清单.json`：`[{fileId,name,sizeBytes}]`），供阶段二按 `scripts/fetch_review_records.py --manifest 排除清单.json` 定向取回——取回只认该清单、落 `复核-人工/`、禁写 `材料-源/`、逐件校验字节数（闭环，防越权取件）。
 3. **工作材料隔离**：表格在任何解析前按 00 §Excel 隐藏数据隔离 重建**只含可见区域的工作版**——人工隐藏的 sheet／行／列／折叠分组由**员工手动隐藏**，整体排除审核范围，Agent **绝对不能纳入审核范围**（禁读禁报）；执行本技能自带脚本 `python3 scripts/prepare_materials.py --case <案例目录>`（**压缩包先解压再审核**、缓存值优先、同名消歧、「值不可得」登记、隐藏区零残留，并做**隐藏区引用审计**：只读可见公式坐标，
 把依赖隐藏输入的可见结果标为「计算链不可复核」——属 H0 范围的可见区缺陷，必须出）。raw 只由 router 持有。
 若需就隐藏区**内容本身**下判断，属 **H1 例外**，必须先取得委托人/审核负责人**书面授权**，并单独成条、
@@ -65,7 +65,7 @@ description: Use when routing or orchestrating report audits from a material pac
 ## 失败与冲突
 
 - `SeqNo` 精确查询为 0 条或多条、`ObjectId` 身份冲突时是定位级硬停止：不得 fetch 候选记录、准备其附件或开始审核，先返回证据并等待人工处理。
-- 阶段一缺少经验证的单附件/allowlist 下载能力且没有已隔离源材料包时停止材料准备并记录 capability gap；尤其不得用全附件下载命令跨过复核记录隔离门禁。
+- 阶段一源材料必须经 `crwu h3yun file get` 单附件定向下载；缺少该命令或没有已隔离源材料包时停止材料准备并记录 capability gap——尤其不得用 `crwu h3yun file download` 整单下载命令跨过复核记录隔离门禁。
 - 单个标签或单个轴画像含混时，只挂起受影响标签/候选并写入 `route_profile.material_gaps[]`；其他已确认标签和轴必须继续求值、并集加载和审核。不得把局部歧义扩大为整体停止。
 - ROUTE001–004 只按 06 挂起受影响的业务/范围/资产标签、基准日或价值类型及其依赖规则；未受影响的技能继续执行。证据冲突不得静默任选一边。
 - 单个专业技能 `pending`、未注册、下载失败或执行失败时逐标签记录原因，其他 `available` 技能和满足条件的公共能力继续执行。

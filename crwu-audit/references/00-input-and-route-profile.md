@@ -84,7 +84,7 @@
 
 评估目的原文、评估方法、结论方法及其位置只能来自真实读取的文件：
 
-1. 用真实 schema code 和 `ObjectId` 下载附件，并确认文件存在且字节数非零。
+1. 源材料附件**只经单附件定向下载**取回：先 `crwu h3yun files list --schema <code> --id <ObjectId>` 取附件元数据，再对源材料件逐个 `crwu h3yun file get --id <FileId> --out <材料-源/…>`；复核件只记入《排除清单》、**永不下载**（阶段一门禁见 SKILL.md 步骤 2）。确认文件存在且字节数非零。
 2. 先用 `file` 识别格式：旧 `.doc` OLE 可用 `textutil -convert txt`；`.docx` 读 OOXML；`.pdf` 用文本提取工具；`.xlsx/.xls` 用相应表格工具。先探测现有工具，不得凭印象宣称不可读。
 3. 在文件中定位原文，为文件级字段回填数组 `source`、`evidence` 与 `location`。没有定位不得用于冲突定论。
 4. 文件未下载或不可读时，字段显式标记 `未抽验（文件未读取）`，不填定位。
