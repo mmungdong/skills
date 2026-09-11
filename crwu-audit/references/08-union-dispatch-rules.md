@@ -66,21 +66,21 @@ skills_to_load = stable_unique(
 
 两个业务一级标签分别保留各自的 `source_skills[]`，不得因为都命中而合并成一个组合技能；子业务只在各自叶子内选用，不进入 `skills_to_load`。
 
-### 设备抵押
+### 机器设备抵押
 
-画像命中 `asset=设备`、`business=融资与债务`（旧行为词 抵押质押，子业务 `抵押与担保`）。解析为 `crwu-audit-asset-equipment (pending)` 与 `crwu-audit-biz-financing-debt (available)`：前者为 `asset+设备` 记录独立 gap，后者正常加载。如果材料含表格，available 的 `crwu-audit-datacheck` 仍必须加载；不得因为对象技能 pending 而空返。
+画像命中 `asset=机器设备`、`business=融资与债务`（旧行为词 抵押质押，子业务 `抵押与担保`）。解析为 `crwu-audit-asset-equipment (available)` 与 `crwu-audit-biz-financing-debt (available)`，两者均加载。如果材料含表格，available 的 `crwu-audit-datacheck` 仍必须加载。
 
 ### 设备类报废物资残余价值评估（国资）
 
-画像命中 `asset=设备`、`business=交易与处置`、`overlay=国资`，材料含测算表。逐标签解析得到：
+画像命中 `asset=废旧物资`、`business=交易与处置`、`overlay=国资`，材料含测算表。逐标签解析得到：
 
-- `crwu-audit-asset-equipment`：pending，记独立 gap；
+- `crwu-audit-asset-scrap-materials`：available，加载；
 - `crwu-audit-biz-transaction-disposal`：available，加载；
 - `crwu-audit-overlay-state-owned`：pending，记独立 gap；
 - `public_skills`：`crwu-audit-public-general-standards` **恒加入**（报告披露层与程序质控层对任何对象均适用），材料含表格再追加 `crwu-audit-datacheck`。
 
-即对象与监管两层专业能力均缺失时，通用准则层与表格勾稽仍必须加载并产出结果；不得因为专业标签 `pending` 而让 `public_skills` 空返。
+即监管层专业能力缺失时，通用准则层与表格勾稽仍必须加载并产出结果；不得因为 `overlay` 标签 `pending` 而让 `public_skills` 空返。
 
 ### 企业价值多资产清算
 
-画像命中 `scope=企业价值`、`asset=房地产 + 设备 + 无形资产`、`business=司法清算与补偿`。`crwu-audit-scope-enterprise-value`、设备、无形资产候选分别记录 gap；`crwu-audit-asset-realestate` 与 `crwu-audit-biz-judicial-liquidation-compensation` 仍加载。资产标签各自保留 `materiality=key|non-key|unknown`：available 且 `key` 的技能必须加载，`unknown` 保留并人工复核，`non-key` 不得删除标签但不让其主导输出。材料含表格时再并入 `crwu-audit-datacheck`。
+画像命中 `scope=企业价值`、`asset=企业价值 + 房地产 + 机器设备 + 无形资产`、`business=司法清算与补偿`。scope 轴 `企业价值` 为 profile-only（审核内容由 asset 轴承接）；`crwu-audit-asset-enterprise-value`、`crwu-audit-asset-realestate`、`crwu-audit-asset-equipment`、`crwu-audit-asset-intangible` 与 `crwu-audit-biz-judicial-liquidation-compensation` 均 available，加载。资产标签各自保留 `materiality=key|non-key|unknown`：available 且 `key` 的技能必须加载，`unknown` 保留并人工复核，`non-key` 不得删除标签但不让其主导输出。材料含表格时再并入 `crwu-audit-datacheck`。

@@ -52,7 +52,7 @@ REGISTRY_HEADER = ("axis", "label", "skill", "status", "load behavior")
 # are reported by the skill-maintainer mapping checker instead of being pinned here.
 EXPECTED_REGISTRY_ROWS = (
     ("asset", "房地产", "crwu-audit-asset-realestate", "available", "load"),
-    ("asset", "设备", "crwu-audit-asset-equipment", "pending", "record gap"),
+    ("asset", "机器设备", "crwu-audit-asset-equipment", "available", "load"),
     ("public", "通用准则", "crwu-audit-public-general-standards", "available", "load always"),
 )
 

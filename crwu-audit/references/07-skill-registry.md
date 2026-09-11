@@ -8,17 +8,21 @@
 | axis | label | skill | status | load behavior |
 | --- | --- | --- | --- | --- |
 | scope | 单项资产 | — | profile-only | no skill |
-| scope | 资产组合 | crwu-audit-scope-asset-portfolio | pending | record gap |
-| scope | 企业价值 | crwu-audit-scope-enterprise-value | pending | record gap |
+| scope | 资产组合 | — | profile-only | review profile |
+| scope | 企业价值 | — | profile-only | review profile |
 | scope | 其他范围 | — | profile-only | review profile |
 | asset | 房地产 | crwu-audit-asset-realestate | available | load |
-| asset | 设备 | crwu-audit-asset-equipment | pending | record gap |
-| asset | 无形资产 | crwu-audit-asset-intangible | pending | record gap |
-| asset | 存货 | crwu-audit-asset-inventory | pending | record gap |
-| asset | 债权 | crwu-audit-asset-debt | pending | record gap |
-| asset | 矿业权 | crwu-audit-asset-mining-right | pending | record gap |
-| asset | 数据资产 | crwu-audit-asset-data | pending | record gap |
-| asset | 森林资源 | crwu-audit-asset-forest | pending | record gap |
+| asset | 机器设备 | crwu-audit-asset-equipment | available | load |
+| asset | 企业价值 | crwu-audit-asset-enterprise-value | available | load |
+| asset | 无形资产 | crwu-audit-asset-intangible | available | load |
+| asset | 矿业权 | crwu-audit-asset-mining-right | available | load |
+| asset | 存货 | crwu-audit-asset-inventory | available | load |
+| asset | 债权 | crwu-audit-asset-debt | available | load |
+| asset | 资产组合 | crwu-audit-asset-portfolio | available | load |
+| asset | 交通运输设备 | crwu-audit-asset-transport-equipment | available | load |
+| asset | 资产组-含商誉 | crwu-audit-asset-asset-group-goodwill | available | load |
+| asset | 废旧物资 | crwu-audit-asset-scrap-materials | available | load |
+| asset | 其他 | crwu-audit-asset-other | available | load |
 | business | 资产经营 | crwu-audit-biz-asset-operation | available | load |
 | business | 交易与处置 | crwu-audit-biz-transaction-disposal | available | load |
 | business | 财务报告 | crwu-audit-biz-financial-reporting | available | load |
@@ -48,3 +52,4 @@
 - pending 只表示能力尚未落地，不表示画像未命中；标签留在 route profile，按 10 产出 gap。
 - 新技能只有真实目录、门禁和所需登记完成后才能从 `pending` 改为 `available`。本表不得以计划中的目录证明可用。
 - 一个技能即使由多个标签命中，也由 08 的 `stable_unique` 去重；不得建立资产×业务等组合技能替代独立轴。
+- `企业价值`／`资产组合` 同时是 scope 轴的范围标签与 asset 轴的一级资产目录：scope 轴只保留范围画像（`profile-only`，不再映射 pending scope 技能），其审核内容由 asset 轴 `crwu-audit-asset-enterprise-value`／`crwu-audit-asset-portfolio` 承接；两轴不互相替代，也不合并为组合技能。
