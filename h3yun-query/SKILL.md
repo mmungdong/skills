@@ -24,7 +24,7 @@ description: >-
 通过 `crwu` CLI，以**当前绑定员工**的权限，按"系统 → 表单 → 记录"逐层帮用户
 查询氚云数据。全程只读；命令全部走 `crwu h3yun ...`（网页会话通道）。
 
-> 命令与字段细节以 [`docs/cli-manual.md`](../../docs/cli-manual.md) 为准；
+> 命令与字段细节以 `crwu scheme`（运行时命令目录）为准；
 > 本文只描述查询会话的交互流程与纪律。
 
 ## 什么时候用
@@ -46,7 +46,7 @@ description: >-
    - 失败/提示 no session：**不要猜测或索取 token**，请用户执行
      `crwu h3yun session bind --token '<JWT>'`（浏览器 DevTools 复制）后再来。
 2. 命令前缀：直接可用 `crwu`；在仓库内也可用构建产物（macOS
-   `./bin/darwin/crwu`，Windows `./bin/windows/crwu.exe`）。
+   PATH 中的 `crwu` 命令）。
 
 ## 主流程（一次只问一个问题）
 
@@ -92,7 +92,7 @@ crwu h3yun records list --schema <schemaCode> --size 20 --filter "F0000036 Equal
   `名称(Name/标题) · 单号(SeqNo 如有) · 更新时间(ModifiedTime) · ID 尾段`。
 - 翻页：`--page <n>`（从 1 开始），提示用户"下一页 20 条？"再执行
   `crwu h3yun records list --schema <code> --page 2 --size 20`。
-- `--filter` 语法（SQL 风格、大小写不敏感，完整表见 `docs/cli-manual.md` §4）：
+- `--filter` 语法（SQL 风格、大小写不敏感，完整表以 `crwu scheme` 为准）：
   - 比较：`=`（或 `Equal`）、`!=`/`<>`（或 `NotEqual`）、`>`/`>=`/`<`/`<=`
     （或 `Above/NotBelow/Below/NotAbove`）
   - 文本：`Contains`（`Like` 同义，氚云没有 Like）、`StartWith`/`EndWith`
@@ -164,4 +164,4 @@ crwu h3yun records get --schema <schemaCode> --id <ObjectId>
 
 ## 更多
 
-- 完整命令与输出契约见 `docs/cli-manual.md`；命令目录实时源为 `crwu scheme`。
+- 完整命令与输出契约以 `crwu scheme` 为准（运行时实时生成，随 CLI 版本变化）。

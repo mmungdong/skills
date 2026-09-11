@@ -1,0 +1,1266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crwu.local/schema/audit-result/1.0.0",
+  "title": "AuditResult",
+  "description": "CRWU 审核意见送达规范 v1.0 §9 统一 AuditResult JSON 数据结构（机器可校验 Schema；语义重算规则见同目录 audit_delivery.py 与规范 §9.4）。",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "auditTask",
+    "phaseControl",
+    "summary",
+    "issues",
+    "manualConfirmationItems",
+    "auditBasis",
+    "reviewComparison",
+    "scope",
+    "professionalTrail",
+    "fileTrace",
+    "renderPolicy",
+    "aiScorecard",
+    "selfAuditErrors"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^1\\."
+    },
+    "auditTask": {
+      "type": "object",
+      "required": [
+        "projectId",
+        "reportVersion",
+        "auditTime",
+        "engineVersion",
+        "profile"
+      ],
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reportVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "auditTime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "engineVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile": {
+          "type": "object",
+          "properties": {
+            "objectType": {
+              "type": "string"
+            },
+            "methods": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "scenario": {
+              "type": "string"
+            },
+            "stage": {
+              "type": "string"
+            },
+            "routeProfile": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "phaseControl": {
+      "type": "object",
+      "required": [
+        "phase1FrozenAt",
+        "phase1Digest"
+      ],
+      "properties": {
+        "phase1FrozenAt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase1Digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reviewAccessedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phase2CompletedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "overallDecision",
+        "narrative",
+        "counts"
+      ],
+      "properties": {
+        "overallDecision": {
+          "enum": [
+            "pass",
+            "fail",
+            "pending_confirmation"
+          ]
+        },
+        "narrative": {
+          "type": "string",
+          "minLength": 1
+        },
+        "counts": {
+          "type": "object",
+          "required": [
+            "issuesTotal",
+            "fail",
+            "high",
+            "medium",
+            "low",
+            "pendingConfirmation",
+            "notChecked"
+          ],
+          "properties": {
+            "issuesTotal": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "fail": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "high": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "medium": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "low": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pendingConfirmation": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "notChecked": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "issueId",
+          "title",
+          "module",
+          "locationSummary",
+          "severity",
+          "issueType",
+          "decision",
+          "problemDescription",
+          "handlingRequirement",
+          "ruleEvidence",
+          "materialEvidence",
+          "gapAnalysis",
+          "recommendedEdits",
+          "flowStatus",
+          "confidence",
+          "reviewComparison"
+        ],
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "module": {
+            "type": "string",
+            "minLength": 1
+          },
+          "locationSummary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "issueType": {
+            "enum": [
+              "rule_defect",
+              "reasonableness_doubt",
+              "unsupported_pending"
+            ]
+          },
+          "decision": {
+            "enum": [
+              "fail",
+              "pending_confirmation",
+              "pass"
+            ]
+          },
+          "problemDescription": {
+            "type": "string",
+            "minLength": 1
+          },
+          "handlingRequirement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ruleEvidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "ruleId",
+                "authorityClass",
+                "sourceType",
+                "title",
+                "version",
+                "clause",
+                "quote",
+                "kbRelativePath",
+                "exportedAt"
+              ],
+              "properties": {
+                "ruleId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "authorityClass": {
+                  "enum": [
+                    "external_formal",
+                    "internal_auxiliary",
+                    "experience_reference"
+                  ]
+                },
+                "sourceType": {
+                  "enum": [
+                    "law",
+                    "valuation_standard",
+                    "valuation_method_rule",
+                    "regulatory",
+                    "association",
+                    "internal_audit",
+                    "crwu_kb",
+                    "risk_case"
+                  ]
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "clause": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quote": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "paraphrase": {
+                  "type": "string"
+                },
+                "kbRelativePath": {
+                  "type": "string",
+                  "pattern": "^(?!/)(?![A-Za-z]:)(?!~)(?!file://)"
+                },
+                "exportedAt": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "materialEvidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "fileId",
+                "displayName",
+                "locator",
+                "excerptOrValue",
+                "evidenceRole"
+              ],
+              "properties": {
+                "fileId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "displayName": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "section": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "locator": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "excerptOrValue": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "evidenceRole": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "contentHash": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "gapAnalysis": {
+            "type": "object",
+            "required": [
+              "ruleRequirement",
+              "observedCondition",
+              "difference",
+              "finalJudgment"
+            ],
+            "properties": {
+              "ruleRequirement": {
+                "type": "string",
+                "minLength": 1
+              },
+              "observedCondition": {
+                "type": "string",
+                "minLength": 1
+              },
+              "difference": {
+                "type": "string",
+                "minLength": 1
+              },
+              "finalJudgment": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "recommendedEdits": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "fileId",
+                "displayName",
+                "locator",
+                "action"
+              ],
+              "properties": {
+                "fileId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "displayName": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "locator": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "action": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "flowStatus": {
+            "enum": [
+              "pending_response",
+              "answered",
+              "reviewed"
+            ]
+          },
+          "confidence": {
+            "type": "object",
+            "required": [
+              "level",
+              "reason"
+            ],
+            "properties": {
+              "level": {
+                "enum": [
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "reviewComparison": {
+            "type": "object",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "not_performed",
+                  "performed"
+                ]
+              },
+              "category": {
+                "enum": [
+                  "A",
+                  "B",
+                  "C",
+                  null
+                ]
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "decision": {
+                  "const": "fail"
+                },
+                "issueType": {
+                  "const": "rule_defect"
+                }
+              },
+              "required": [
+                "decision",
+                "issueType"
+              ]
+            },
+            "then": {
+              "properties": {
+                "ruleEvidence": {
+                  "minItems": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "manualConfirmationItems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "itemId",
+          "title",
+          "locationSummary",
+          "observation",
+          "questionToConfirm",
+          "evidence",
+          "suggestedAction"
+        ],
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "locationSummary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "observation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "questionToConfirm": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1
+          },
+          "suggestedAction": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "auditBasis": {
+      "type": "object",
+      "required": [
+        "rules",
+        "ruleMap",
+        "knowledgeBaseFiles"
+      ],
+      "properties": {
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "ruleId",
+              "authorityClass",
+              "sourceType",
+              "title",
+              "version",
+              "clause",
+              "quote",
+              "kbRelativePath",
+              "exportedAt",
+              "usageCount",
+              "purposes",
+              "usedByIssueIds"
+            ],
+            "properties": {
+              "ruleId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "authorityClass": {
+                "enum": [
+                  "external_formal",
+                  "internal_auxiliary",
+                  "experience_reference"
+                ]
+              },
+              "sourceType": {
+                "enum": [
+                  "law",
+                  "valuation_standard",
+                  "valuation_method_rule",
+                  "regulatory",
+                  "association",
+                  "internal_audit",
+                  "crwu_kb",
+                  "risk_case"
+                ]
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "clause": {
+                "type": "string",
+                "minLength": 1
+              },
+              "effectiveStatus": {
+                "enum": [
+                  "effective",
+                  "expired",
+                  "unknown",
+                  "internal"
+                ]
+              },
+              "quote": {
+                "type": "string",
+                "minLength": 1
+              },
+              "paraphrase": {
+                "type": "string"
+              },
+              "kbRelativePath": {
+                "type": "string",
+                "pattern": "^(?!/)(?![A-Za-z]:)(?!~)(?!file://)"
+              },
+              "exportedAt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "usageCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "purposes": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "usedByIssueIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "sourceFingerprint": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "ruleMap": {
+          "type": "object"
+        },
+        "knowledgeBaseFiles": {
+          "type": "array"
+        }
+      }
+    },
+    "reviewComparison": {
+      "type": "object",
+      "required": [
+        "status",
+        "bands",
+        "reviewerOnlyItems",
+        "metrics"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_performed",
+            "performed"
+          ]
+        },
+        "hiddenRegionAccess": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "authorizedBy",
+              "authorizedAt",
+              "authorization",
+              "scope",
+              "notRead"
+            ],
+            "properties": {
+              "authorizedBy": {
+                "type": "string",
+                "minLength": 1
+              },
+              "authorizedAt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "authorization": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scope": {
+                "type": "string",
+                "minLength": 1
+              },
+              "notRead": {
+                "type": "string"
+              },
+              "resultingIssueIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "bands": {
+          "type": "object",
+          "required": [
+            "overlap",
+            "aiOnly",
+            "divergent",
+            "reviewerOnly"
+          ],
+          "properties": {
+            "overlap": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "aiOnly": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "divergent": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "reviewerOnly": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "reviewerOnlyItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "itemId",
+              "title",
+              "reviewerEvidence",
+              "handling",
+              "inFileResolution"
+            ],
+            "properties": {
+              "itemId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reviewerEvidence": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "locator",
+                  "quote"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "locator": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quote": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "inFileResolution": {
+                "enum": [
+                  "L-resolved",
+                  "L-open",
+                  "L-unclosed",
+                  "L-uncheckable"
+                ]
+              },
+              "inFileEvidence": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "locator"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "locator": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quote": {
+                    "type": "string"
+                  }
+                }
+              },
+              "closureEvidence": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "locator"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "locator": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quote": {
+                    "type": "string"
+                  }
+                }
+              },
+              "handling": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "required": [
+            "denominator"
+          ],
+          "properties": {
+            "aiHitRate": {
+              "type": "string"
+            },
+            "denominator": {
+              "type": "string",
+              "minLength": 1
+            },
+            "denominatorExclResolved": {
+              "type": "string"
+            },
+            "aiHitRateExclResolved": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "inputs",
+        "checkDomains",
+        "notCheckedItems",
+        "limitations"
+      ],
+      "properties": {
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "fileId",
+              "displayName",
+              "version",
+              "readable"
+            ],
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "displayName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "readable": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "checkDomains": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "notCheckedItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "itemId",
+              "item",
+              "reasonCode",
+              "reason",
+              "impact",
+              "requiredAction",
+              "relatedFiles"
+            ],
+            "properties": {
+              "itemId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "item": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reasonCode": {
+                "enum": [
+                  "missing_material",
+                  "unreadable",
+                  "unsupported",
+                  "out_of_scope",
+                  "not_applicable"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "impact": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requiredAction": {
+                "type": "string",
+                "minLength": 1
+              },
+              "relatedFiles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "professionalTrail": {
+      "type": "object",
+      "required": [
+        "applicableRuleSnapshot",
+        "adjudications",
+        "checkRecords",
+        "comprehensiveComparison"
+      ],
+      "properties": {
+        "applicableRuleSnapshot": {
+          "type": "object"
+        },
+        "adjudications": {
+          "type": "array"
+        },
+        "checkRecords": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "recordId",
+              "domain",
+              "checkItem",
+              "targets",
+              "evidence",
+              "result",
+              "linkedIssueIds",
+              "performedAt",
+              "executor"
+            ],
+            "properties": {
+              "recordId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "domain": {
+                "type": "string",
+                "minLength": 1
+              },
+              "checkItem": {
+                "type": "string",
+                "minLength": 1
+              },
+              "targets": {
+                "type": "array"
+              },
+              "evidence": {
+                "type": "array",
+                "minItems": 1
+              },
+              "result": {
+                "enum": [
+                  "pass",
+                  "difference",
+                  "not_applicable",
+                  "not_checked"
+                ]
+              },
+              "linkedIssueIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "performedAt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "executor": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "comprehensiveComparison": {
+          "type": "object"
+        }
+      }
+    },
+    "fileTrace": {
+      "type": "object",
+      "required": [
+        "generatedAt",
+        "rendererVersion",
+        "sourceDigest",
+        "embeddedJsonDigest"
+      ],
+      "properties": {
+        "generatedAt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rendererVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{64})?$"
+        },
+        "embeddedJsonDigest": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{64})?$"
+        }
+      }
+    },
+    "renderPolicy": {
+      "type": "object",
+      "required": [
+        "printTrail",
+        "language"
+      ],
+      "properties": {
+        "printTrail": {
+          "type": "boolean"
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "aiScorecard": {
+      "type": "object",
+      "description": "AI 审核评分卡（自评；用于量化 AI 审核与人工复核的差距）。初审由 AI 自评，复审在初审基础上补充与校正（只增不覆盖）。",
+      "required": [
+        "level",
+        "dimensions",
+        "composites"
+      ],
+      "properties": {
+        "level": {
+          "enum": [
+            "初审",
+            "复审",
+            "终审"
+          ],
+          "description": "审核级次，取值与台账 review_level 一致（初审/复审/终审）"
+        },
+        "dimensions": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": [
+              "key",
+              "label",
+              "score",
+              "max",
+              "basis"
+            ],
+            "properties": {
+              "key": {
+                "enum": [
+                  "first_delivery_correctness",
+                  "self_correction",
+                  "incremental_value",
+                  "coverage_completeness",
+                  "process_discipline",
+                  "judgment_quality"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10,
+                "multipleOf": 0.5
+              },
+              "max": {
+                "const": 10
+              },
+              "basis": {
+                "type": "string",
+                "minLength": 1,
+                "description": "打分依据（必填，禁止无依据给分）"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "composites": {
+          "type": "object",
+          "required": [
+            "aiOnly"
+          ],
+          "properties": {
+            "aiOnly": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "multipleOf": 0.5,
+              "description": "综合·AI 单机：六维均值按 0.5 取整"
+            },
+            "withHumanLoop": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "multipleOf": 0.5,
+              "description": "综合·含人机复核闭环：复审校正后六维均值按 0.5 取整"
+            }
+          }
+        },
+        "corrections": {
+          "type": "array",
+          "description": "复审对初审分数的补充与校正（只增不覆盖，逐条给理由）",
+          "items": {
+            "type": "object",
+            "required": [
+              "key",
+              "from",
+              "to",
+              "reason"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "from": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10,
+                "multipleOf": 0.5
+              },
+              "to": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10,
+                "multipleOf": 0.5
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "selfAuditErrors": {
+      "type": "array",
+      "description": "AI 审核错误项（AI 自身出错记录；初审即产出，复审追加人工指出/在件核验发现的错误）",
+      "items": {
+        "type": "object",
+        "required": [
+          "errorId",
+          "kind",
+          "discoveredAt",
+          "description"
+        ],
+        "properties": {
+          "errorId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "false_positive",
+              "correction",
+              "omission",
+              "wording"
+            ]
+          },
+          "discoveredAt": {
+            "enum": [
+              "初审",
+              "复审",
+              "终审"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "correction": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "issueId": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

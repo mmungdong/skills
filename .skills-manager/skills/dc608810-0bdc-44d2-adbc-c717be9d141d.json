@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "dc608810-0bdc-44d2-adbc-c717be9d141d",
+  "path": "crwu-audit-biz-financial-reporting",
+  "path_key": "crwu-audit-biz-financial-reporting",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://gitee.com/mengdong123/crwu-ai",
+    "subpath": "skills/crwu-audit-biz-financial-reporting",
+    "branch": null
+  }
+}

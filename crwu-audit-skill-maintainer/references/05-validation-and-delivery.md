@@ -3,7 +3,7 @@
 ## 检查器
 
 ```bash
-python3 skills/crwu-audit-skill-maintainer/scripts/check_audit_skill_mappings.py \
+python3 scripts/check_audit_skill_mappings.py \
   --repo-root <source-repo> \
   --catalog <目录树、snapshot 或 node-index> \
   --format text
@@ -41,7 +41,7 @@ python3 skills/crwu-audit-skill-maintainer/scripts/check_audit_skill_mappings.py
 | `KB_PATH_KEY_NOT_IN_CATALOG` | error | 技能里写的库内路径键在最新目录中不存在（跨库/改名/编号漂移） |
 | `KB_PATH_KEY_HAS_EXPORT_SUFFIX` | error | 路径键带了 `.md` 导出后缀（或把文件当目录写）；`.md` 只是导出后的本地文件名，不是库内节点名 |
 | `KB_PATH_KEY_FOLDER_NEEDS_SLASH` | error | 路径键指向目录却没以 `/` 结尾（会被当成单文件项而记 failure） |
-| `BUSINESS_COMMON_REVIEW_NOT_REFERENCED` | warning | 一级业务目录存在 `共同审核点`，但该业务 Skill 未下载/未回指它；仅在该文档确实存在时触发，文档不存在不报 |
+| `BUSINESS_COMMON_REVIEW_NOT_REFERENCED` | warning | 一级业务目录存在 `共同审核点`，但该业务 Skill **未以路径键回指**它（必须写出 `<一级根>共同审核点`，节点名可带数字前缀或 `.md`）；仅在该文档确实存在时触发，文档不存在不报。**只提名字不算回指**——写"一级根未提供 `共同审核点`"这种否定句同样会被报出 |
 | `CATALOG_NOT_LIVE` | error | 使用 `--max-age-hours` 时，快照无可解析抓取时间（无法证明是最新） |
 | `CATALOG_STALE` | error | 使用 `--max-age-hours` 时，快照抓取时间超过时限 |
 
@@ -53,18 +53,24 @@ python3 skills/crwu-audit-skill-maintainer/scripts/check_audit_skill_mappings.py
 - `REGISTRY_LABEL_NOT_IN_CATALOG` 只针对 `available` 行；`pending` 行的目录缺失属于正常中间态。
 - 重复 registry 行只按一条主张校验，避免同一问题重复计数。
 
-路径键检查范围：`skills/crwu-audit*` 全部 `.md` 的**反引号内容**（技能约定寻址键写在反引号里）；只判断**本次目录已捕获的顶层容器**下的键——局部快照不会被误读为"另一轴全失效"。含 `…`／`*`／`<>`／`某`／`待建`／`不存在`／`省略` 的写法视为示例，不检查。
+路径键检查范围：skills 根下 `crwu-audit*` 技能目录全部 `.md` 的**反引号内容**（技能约定寻址键写在反引号里）；只判断**本次目录已捕获的顶层容器**下的键——局部快照不会被误读为"另一轴全失效"。含 `…`／`*`／`<>`／`某`／`待建`／`不存在`／`省略` 的写法视为示例，不检查。
+
+`--emit-map` 的幂等要求：校准表 `07-kb-skill-map.md` 自身就在扫描范围内，因此它写出的「库内路径键健康」诊断表**不得给未命中键加反引号**（否则下一轮会把这张表当成本文件的新漂移，并把别的技能的漂移重复记到维护器名下）。回归见本技能 `scripts/test_audit_skill_maintainer.py::test_emitted_calibration_table_does_not_become_drift`。
+
+`--format json` 的 stdout 纯净：报告是 stdout 上的唯一对象；`--emit-map` 的"校准表已更新"通知在该模式下走 stderr，便于调用方直接解析。
 
 默认发现错误仍退出 0，方便盘点交付；CI 使用 `--strict`，存在 error finding 时退出 1。解析失败或输入不支持退出 2。
 
 ## 新 Skill 验证
 
 ```bash
-python3 tools/kb/test_audit_skill_maintainer.py
-python3 <skill-creator>/scripts/quick_validate.py skills/crwu-audit-skill-maintainer
-python3 tools/kb/test_audit_multiaxis_router.py
-python3 tools/kb/test_dws_source_contract.py
-python3 tools/kb/kb_tool.py validate --skill-root skills
+# 以下命令在技能目录内执行（`scripts/` = 本技能自带脚本）；跨技能脚本用安装根寻址
+SKILLS_ROOT=<本技能所安装到的 skills 根>
+python3 scripts/test_audit_skill_maintainer.py
+python3 <skill-creator>/scripts/quick_validate.py <本技能目录>
+python3 "$SKILLS_ROOT/crwu-audit/scripts/test_audit_multiaxis_router.py"
+python3 "$SKILLS_ROOT/crwu-dws/scripts/test_dws_source_contract.py"
+python3 scripts/kb_tool.py validate --skill-root "$SKILLS_ROOT"
 git diff --check
 ```
 

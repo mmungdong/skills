@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "110c9f07-5223-43b2-ac89-e03f0caa71bb",
+  "path": "crwu-dws",
+  "path_key": "crwu-dws",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://gitee.com/mengdong123/crwu-ai",
+    "subpath": "skills/crwu-dws",
+    "branch": null
+  }
+}

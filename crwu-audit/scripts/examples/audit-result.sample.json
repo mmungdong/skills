@@ -1,0 +1,518 @@
+{
+  "schemaVersion": "1.0.0",
+  "auditTask": {
+    "projectId": "PRJ-2026-0001",
+    "reportVersion": "v1.0",
+    "auditTime": "2026-09-10T09:00:00+08:00",
+    "engineVersion": "audit-skill v0.1",
+    "profile": {
+      "objectType": "企业价值评估（示意）",
+      "methods": [
+        "市场法",
+        "收益法"
+      ],
+      "scenario": "股权转让（示意）",
+      "stage": "报告审核",
+      "routeProfile": {
+        "scope_types": [
+          "企业价值"
+        ],
+        "asset_types": [
+          "房地产"
+        ],
+        "business_types": [
+          "股权转让"
+        ],
+        "overlays": [
+          "证券"
+        ],
+        "weak_structured": false
+      }
+    }
+  },
+  "phaseControl": {
+    "phase1FrozenAt": "2026-09-09T10:00:00+08:00",
+    "phase1Digest": "0f3d2a4b5c6d7e8f9a0b1c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f607",
+    "reviewAccessedAt": "2026-09-09T11:00:00+08:00",
+    "phase2CompletedAt": "2026-09-09T12:00:00+08:00"
+  },
+  "summary": {
+    "overallDecision": "fail",
+    "narrative": "本次审核（示意数据）发现 2 条需要处理的问题、1 项待人工确认事项与 1 项未检查项；规则与材料双证据均在专业审核轨迹中可追溯。",
+    "counts": {
+      "issuesTotal": 2,
+      "fail": 2,
+      "high": 1,
+      "medium": 1,
+      "low": 0,
+      "pendingConfirmation": 1,
+      "notChecked": 1
+    }
+  },
+  "issues": [
+    {
+      "issueId": "ISS-MKT-007",
+      "title": "可比案例交易时间调整依据不足（示意）",
+      "module": "marketApproach",
+      "locationSummary": "评估说明.docx 第 35 页 市场法；市场法测算表.xlsx 市场法!F18:F22",
+      "severity": "medium",
+      "issueType": "rule_defect",
+      "decision": "fail",
+      "problemDescription": "可比案例交易日期与评估基准日存在时间差异，未见修正，也未见不调整的分析与理由（示意）。",
+      "handlingRequirement": "补充说明并核实测算",
+      "ruleEvidence": [
+        {
+          "ruleId": "RULE-MKT-001",
+          "authorityClass": "external_formal",
+          "sourceType": "valuation_standard",
+          "title": "资产评估方法相关准则（示意）",
+          "version": "2026-09-10T09:00:00+08:00 本次读取版本（示意）",
+          "clause": "第 XX 条（示意）",
+          "quote": "应当分析并处理影响价值的差异因素（示意原文）",
+          "kbRelativePath": "03-评估方法/市场法/规则文件.md",
+          "exportedAt": "2026-09-10T09:00:00+08:00"
+        }
+      ],
+      "materialEvidence": [
+        {
+          "fileId": "F-002",
+          "displayName": "评估说明.docx",
+          "section": "市场法",
+          "locator": "第 35 页 可比案例选择",
+          "excerptOrValue": "案例交易日期与评估基准日存在时间差异（示意摘录）",
+          "evidenceRole": "missing_disclosure"
+        },
+        {
+          "fileId": "F-003",
+          "displayName": "市场法测算表.xlsx",
+          "section": "市场法",
+          "locator": "市场法!F18:F22",
+          "excerptOrValue": "1.0000 / 1.0000 / 1.0000（示意数值）",
+          "evidenceRole": "parameter_value"
+        }
+      ],
+      "gapAnalysis": {
+        "ruleRequirement": "应对影响价值的差异因素进行分析并作必要处理（示意转述）。",
+        "observedCondition": "存在交易时间差异，未见调整与不调整说明（示意）。",
+        "difference": "现有材料不能证明已满足规则要求（示意）。",
+        "finalJudgment": "不符合（示意）"
+      },
+      "recommendedEdits": [
+        {
+          "fileId": "F-002",
+          "displayName": "评估说明.docx",
+          "locator": "市场法章节",
+          "action": "补充交易时间差异分析与不调整理由；如需调整，补充参数来源与计算过程（示意）。"
+        }
+      ],
+      "flowStatus": "pending_response",
+      "confidence": {
+        "level": "high",
+        "reason": "规则与两份材料均可定位（示意）"
+      },
+      "reviewComparison": {
+        "status": "performed",
+        "category": "A"
+      }
+    },
+    {
+      "issueId": "ISS-DC-003",
+      "title": "测算明细表合计与报告结论不一致（示意）",
+      "module": "dataCheck",
+      "locationSummary": "测算明细表.xlsx 汇总!B12；报告.docx 第 12 页 评估结论",
+      "severity": "high",
+      "issueType": "rule_defect",
+      "decision": "fail",
+      "problemDescription": "测算明细表汇总值 1,234.00 与报告结论 1,244.00 不一致（示意数值）。",
+      "handlingRequirement": "核实后处理",
+      "ruleEvidence": [
+        {
+          "ruleId": "RULE-RPT-004",
+          "authorityClass": "internal_auxiliary",
+          "sourceType": "crwu_kb",
+          "title": "CRWU 报告数据一致性内部检查清单（示意）",
+          "version": "内部 v1（示意）",
+          "clause": "数据一致性检查点 DC-003（示意）",
+          "quote": "报告结论数字应与测算明细表汇总一致（示意原文）",
+          "kbRelativePath": "06-规则库/M-数据对齐-勾稽与一致性/清单-数据校对.md",
+          "exportedAt": "2026-09-10T09:05:00+08:00"
+        }
+      ],
+      "materialEvidence": [
+        {
+          "fileId": "F-004",
+          "displayName": "测算明细表.xlsx",
+          "section": "汇总",
+          "locator": "汇总!B12",
+          "excerptOrValue": "1234.00（示意数值）",
+          "evidenceRole": "parameter_value"
+        }
+      ],
+      "gapAnalysis": {
+        "ruleRequirement": "报告结论与测算明细表汇总应一致（示意转述）。",
+        "observedCondition": "两者相差 10.00（示意数值）。",
+        "difference": "差异未见说明或修正记录（示意）。",
+        "finalJudgment": "不符合（示意）"
+      },
+      "recommendedEdits": [
+        {
+          "fileId": "F-004",
+          "displayName": "测算明细表.xlsx",
+          "locator": "汇总!B12",
+          "action": "核验合计口径并修正，或补充差异说明（示意）。"
+        }
+      ],
+      "flowStatus": "pending_response",
+      "confidence": {
+        "level": "high",
+        "reason": "两个数值均可定位（示意）"
+      },
+      "reviewComparison": {
+        "status": "performed",
+        "category": "B"
+      }
+    }
+  ],
+  "manualConfirmationItems": [
+    {
+      "itemId": "MC-001",
+      "title": "收益法折现率取值依据尚不能确认（示意）",
+      "locationSummary": "评估说明.docx 第 41 页 收益法参数",
+      "observation": "折现率取 10.5%，未见来源说明（示意）。",
+      "questionToConfirm": "该取值是否有内部或外部依据文件支持？（示意）",
+      "evidence": [
+        "评估说明.docx 第 41 页 收益法参数 折现率 10.5%（示意）"
+      ],
+      "suggestedAction": "请项目负责人提供参数来源或补充说明（示意）。"
+    }
+  ],
+  "auditBasis": {
+    "rules": [
+      {
+        "ruleId": "RULE-MKT-001",
+        "authorityClass": "external_formal",
+        "sourceType": "valuation_standard",
+        "title": "资产评估方法相关准则（示意）",
+        "version": "2026-09-10T09:00:00+08:00 本次读取版本（示意）",
+        "clause": "第 XX 条（示意）",
+        "effectiveStatus": "unknown",
+        "quote": "应当分析并处理影响价值的差异因素（示意原文）",
+        "kbRelativePath": "03-评估方法/市场法/规则文件.md",
+        "exportedAt": "2026-09-10T09:00:00+08:00",
+        "usageCount": 1,
+        "purposes": [
+          "评估方法规则核对"
+        ],
+        "usedByIssueIds": [
+          "ISS-MKT-007"
+        ]
+      },
+      {
+        "ruleId": "RULE-RPT-004",
+        "authorityClass": "internal_auxiliary",
+        "sourceType": "crwu_kb",
+        "title": "CRWU 报告数据一致性内部检查清单（示意）",
+        "version": "内部 v1（示意）",
+        "clause": "数据一致性检查点 DC-003（示意）",
+        "effectiveStatus": "internal",
+        "quote": "报告结论数字应与测算明细表汇总一致（示意原文）",
+        "kbRelativePath": "06-规则库/M-数据对齐-勾稽与一致性/清单-数据校对.md",
+        "exportedAt": "2026-09-10T09:05:00+08:00",
+        "usageCount": 1,
+        "purposes": [
+          "数据勾稽覆盖核查"
+        ],
+        "usedByIssueIds": [
+          "ISS-DC-003"
+        ]
+      }
+    ],
+    "ruleMap": {
+      "external_formal": {
+        "valuation_standard": [
+          "RULE-MKT-001"
+        ]
+      },
+      "internal_auxiliary": {
+        "crwu_kb": [
+          "RULE-RPT-004"
+        ]
+      }
+    },
+    "knowledgeBaseFiles": [
+      {
+        "path": "03-评估方法/市场法/规则文件.md",
+        "exportedAt": "2026-09-10T09:00:00+08:00"
+      },
+      {
+        "path": "06-规则库/M-数据对齐-勾稽与一致性/清单-数据校对.md",
+        "exportedAt": "2026-09-10T09:05:00+08:00"
+      }
+    ]
+  },
+  "reviewComparison": {
+    "status": "performed",
+    "bands": {
+      "overlap": 1,
+      "aiOnly": 1,
+      "divergent": 0,
+      "reviewerOnly": 1
+    },
+    "reviewerOnlyItems": [
+      {
+        "itemId": "RO-001",
+        "title": "复核意见提到评估范围披露不完整（示意）",
+        "reviewerEvidence": {
+          "file": "G15-4三级审核意见-示意.docx",
+          "locator": "第 2 页 条目 1-3",
+          "quote": "评估范围披露不完整，请补充（示意摘录）"
+        },
+        "handling": "漏检候选：先查适用规则集快照与逐条裁定表归因；确属本次审核面则走隔离补审（示意）。",
+        "inFileResolution": "L-open",
+        "inFileEvidence": {
+          "file": "13-评估说明-轻型汽车-定稿.docx",
+          "locator": "评估范围章节",
+          "quote": "（示意）被审件中未落实该披露"
+        }
+      }
+    ],
+    "metrics": {
+      "aiHitRate": "0.50",
+      "denominator": "2 条复核事项（示意）",
+      "denominatorExclResolved": "1 条未落实",
+      "aiHitRateExclResolved": "0.00"
+    }
+  },
+  "scope": {
+    "inputs": [
+      {
+        "fileId": "F-001",
+        "displayName": "报告.docx",
+        "version": "v1.0",
+        "readable": true
+      },
+      {
+        "fileId": "F-002",
+        "displayName": "评估说明.docx",
+        "version": "v1.0",
+        "readable": true
+      },
+      {
+        "fileId": "F-004",
+        "displayName": "测算明细表.xlsx",
+        "version": "v1.0",
+        "readable": true
+      },
+      {
+        "fileId": "F-009",
+        "displayName": "权属附件扫描件.pdf",
+        "version": "v1.0",
+        "readable": false
+      }
+    ],
+    "checkDomains": [
+      "报告正文",
+      "评估说明",
+      "测算明细表",
+      "数据勾稽",
+      "监管覆盖核查"
+    ],
+    "notCheckedItems": [
+      {
+        "itemId": "NC-001",
+        "item": "权属附件扫描件内的权证信息（示意）",
+        "reasonCode": "unreadable",
+        "reason": "扫描件质量不足，OCR 无法可靠识别（示意）。",
+        "impact": "权属披露类检查点无法确认（示意）。",
+        "requiredAction": "重新提供可读电子件或交人工复核（示意）。",
+        "relatedFiles": [
+          "权属附件扫描件.pdf"
+        ]
+      }
+    ],
+    "limitations": [
+      "扫描件 OCR 质量（示意）",
+      "宏与外部链接未执行（示意）"
+    ]
+  },
+  "professionalTrail": {
+    "applicableRuleSnapshot": {
+      "装配键": "企业价值 × 市场法/收益法 × 股权转让 × 报告审核（示意）",
+      "命中规则数": 2,
+      "未装载原因": "无（示意）"
+    },
+    "adjudications": [
+      {
+        "recordId": "CHK-MKT-001",
+        "itemRef": "可比案例选择与修正（示意）",
+        "result": "difference"
+      },
+      {
+        "recordId": "CHK-MKT-002",
+        "itemRef": "可比案例数量与来源（示意）",
+        "result": "pass"
+      }
+    ],
+    "checkRecords": [
+      {
+        "recordId": "AI-001",
+        "domain": "AI 检查",
+        "checkItem": "折现率取值与来源核对（示意）",
+        "targets": [
+          "评估说明.docx 第 41 页"
+        ],
+        "evidence": [
+          "折现率 10.5%，未见来源说明（示意）"
+        ],
+        "result": "difference",
+        "linkedIssueIds": [
+          "ISS-MKT-007"
+        ],
+        "performedAt": "2026-09-09T09:30:00+08:00",
+        "executor": "crwu-audit-market-approach（示意）"
+      },
+      {
+        "recordId": "DC-003",
+        "domain": "数据核查",
+        "checkItem": "汇总与报告结论勾稽（示意）",
+        "targets": [
+          "测算明细表.xlsx 汇总!B12",
+          "报告.docx 第 12 页"
+        ],
+        "evidence": [
+          "1234.00 与 1244.00（示意数值）"
+        ],
+        "result": "difference",
+        "linkedIssueIds": [
+          "ISS-DC-003"
+        ],
+        "performedAt": "2026-09-09T09:40:00+08:00",
+        "executor": "crwu-audit-datacheck（示意）"
+      }
+    ],
+    "comprehensiveComparison": {
+      "相互印证": 1,
+      "AI 新增": 1,
+      "复核独有": 1,
+      "AI 命中率": "0.50"
+    }
+  },
+  "fileTrace": {
+    "generatedAt": "2026-09-10T09:30:00+08:00",
+    "rendererVersion": "renderer/1.0.0",
+    "sourceDigest": "",
+    "embeddedJsonDigest": ""
+  },
+  "renderPolicy": {
+    "printTrail": false,
+    "language": "zh-CN"
+  },
+  "aiScorecard": {
+    "level": "复审",
+    "dimensions": [
+      {
+        "key": "first_delivery_correctness",
+        "label": "首轮交付正确性",
+        "score": 6.0,
+        "max": 10,
+        "basis": "（示意）依据本维度对应证据与复核对照结果打分",
+        "evidence": [
+          "professionalTrail.checkRecords"
+        ]
+      },
+      {
+        "key": "self_correction",
+        "label": "自我纠错与定位",
+        "score": 7.0,
+        "max": 10,
+        "basis": "（示意）依据本维度对应证据与复核对照结果打分",
+        "evidence": [
+          "professionalTrail.checkRecords"
+        ]
+      },
+      {
+        "key": "incremental_value",
+        "label": "增量发现价值",
+        "score": 8.0,
+        "max": 10,
+        "basis": "（示意）依据本维度对应证据与复核对照结果打分",
+        "evidence": [
+          "professionalTrail.checkRecords"
+        ]
+      },
+      {
+        "key": "coverage_completeness",
+        "label": "覆盖完整性",
+        "score": 7.0,
+        "max": 10,
+        "basis": "（示意）依据本维度对应证据与复核对照结果打分",
+        "evidence": [
+          "professionalTrail.checkRecords"
+        ]
+      },
+      {
+        "key": "process_discipline",
+        "label": "过程纪律与可追溯",
+        "score": 7.0,
+        "max": 10,
+        "basis": "（示意）依据本维度对应证据与复核对照结果打分",
+        "evidence": [
+          "professionalTrail.checkRecords"
+        ]
+      },
+      {
+        "key": "judgment_quality",
+        "label": "本轮判断质量",
+        "score": 6.0,
+        "max": 10,
+        "basis": "（示意）依据本维度对应证据与复核对照结果打分",
+        "evidence": [
+          "professionalTrail.checkRecords"
+        ]
+      }
+    ],
+    "composites": {
+      "aiOnly": 7.0,
+      "withHumanLoop": 7.5
+    },
+    "corrections": [
+      {
+        "key": "first_delivery_correctness",
+        "from": 6.0,
+        "to": 7.5,
+        "reason": "（示意）人工复核指出 1 条漏检，已在复审补审闭环，首轮正确性按闭环后校正"
+      },
+      {
+        "key": "judgment_quality",
+        "from": 6.0,
+        "to": 7.0,
+        "reason": "（示意）复核对照后原判据得到印证，判断质量上调"
+      }
+    ]
+  },
+  "selfAuditErrors": [
+    {
+      "errorId": "SAE-001",
+      "kind": "false_positive",
+      "discoveredAt": "初审",
+      "description": "（示意）初审阶段自查发现 1 条结论不成立，已撤回。",
+      "evidence": [
+        "issues[ISS-DC-003]"
+      ],
+      "correction": "撤回该条",
+      "status": "closed",
+      "issueId": "ISS-DC-003"
+    },
+    {
+      "errorId": "SAE-002",
+      "kind": "omission",
+      "discoveredAt": "复审",
+      "description": "（示意）人工复核提出而 AI 未命中 1 条，属漏检，已按在件核验定性为 L-open 并补审。",
+      "evidence": [
+        "reviewComparison.reviewerOnlyItems[RO-001]"
+      ],
+      "correction": "隔离补审后新增条目",
+      "status": "closed"
+    }
+  ]
+}

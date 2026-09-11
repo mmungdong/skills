@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Read-only inventory checker for crwu-audit asset and business skills."""
+"""Read-only inventory checker for crwu-audit asset and business skills.
+
+源仓维护工具：以 `--repo-root <源仓>` 定位技能树（skills/ 下的 crwu-audit 族），
+用于源仓一致性盘点与门禁，运行时不需要它。
+"""
 
 from __future__ import annotations
 
@@ -473,8 +477,30 @@ def _find_named_folder(paths: set[str], parent: str, label: str) -> str | None:
     return None
 
 
+def _named_doc(paths: set[str], parent: str, label: str) -> str | None:
+    """Exact library node name of a direct child document carrying `label`, or None."""
+    for name in _direct_docs(paths, parent):
+        if _label(name) == label:
+            return name
+    return None
+
+
 def _has_named_doc(paths: set[str], parent: str, label: str) -> bool:
-    return any(_label(name) == label for name in _direct_docs(paths, parent))
+    return _named_doc(paths, parent, label) is not None
+
+
+def _references_common_review(text: str, kb_root: str, doc_name: str) -> bool:
+    """Does the skill positively address the shared review layer by its library path key?
+
+    Naming the document is not enough: a leaf that says "一级根**未提供** `共同审核点`" mentions it
+    too, and a plain `in` test would let that stale claim pass (the exact field bug this fixes).
+    The reference must therefore carry the first-level root (`<kb_root><节点名>`). Both the catalog
+    node name and the bare label are accepted, because older libraries prefix/suffix node names
+    (`01-共同审核点.md`) while the current one ships `共同审核点` verbatim.
+    """
+    prefix = _normalize_path(kb_root, folder=True)
+    candidates = {BUSINESS_COMMON_REVIEW_DOC, doc_name, _label(doc_name)}
+    return any(f"{prefix}{candidate}" in text for candidate in candidates if candidate)
 
 
 def _frontmatter_name(path: Path) -> str | None:
@@ -1060,16 +1086,21 @@ def inspect_repository(
                     )
 
         if row.axis == "business" and expected_root is not None:
-            if _has_named_doc(paths, expected_root, BUSINESS_COMMON_REVIEW_DOC):
+            common_review_doc = _named_doc(paths, expected_root, BUSINESS_COMMON_REVIEW_DOC)
+            if common_review_doc is not None:
                 focus = skill_dir / "references" / "02-review-focus.md"
                 focus_text = focus.read_text(encoding="utf-8") if focus.is_file() else ""
-                if BUSINESS_COMMON_REVIEW_DOC not in assembly_text + focus_text:
+                if not _references_common_review(
+                    assembly_text + focus_text, expected_root, common_review_doc
+                ):
                     add_finding(
                         "BUSINESS_COMMON_REVIEW_NOT_REFERENCED",
                         "warning",
                         (
-                            f"the first-level business folder ships {BUSINESS_COMMON_REVIEW_DOC}; "
-                            "the business skill must download and reference it as the shared review layer"
+                            f"the first-level business folder ships {common_review_doc}; "
+                            "the business skill must address it by its library path key "
+                            f"({expected_root}{common_review_doc}) as the shared review layer "
+                            "— merely naming the document (e.g. claiming it is absent) does not count"
                         ),
                         axis=row.axis,
                         label=row.label,
@@ -1538,15 +1569,23 @@ def render_calibration(report: dict[str, object], previous: str | None = None) -
         "## 库内路径键健康（公共轴也查）",
         "",
         (
-            f"检查 {path_keys.get('checked', 0)} 个寻址键（扫描 `skills/crwu-audit*` 全部 .md 的反引号库内路径）："
+            f"检查 {path_keys.get('checked', 0)} 个寻址键（扫描 audit 族技能目录内全部 .md 的反引号库内路径）："
             + ("**全部命中本次目录**" if not key_issues else f"**{len(key_issues)} 个未命中**")
         ),
         "",
     ]
     if key_issues:
-        lines += ["| Skill | 路径键 |", "| --- | --- |"]
-        lines += [f"| `{i['skill']}` | `{i['key']}` |" for i in key_issues]
-        lines.append("")
+        lines += [
+            "| Skill | 路径键 |",
+            "| --- | --- |",
+            # Deliberately NOT backticked: this calibration table is itself inside the scanned
+            # audit-family skill tree, so backticking a missing key here would make the next
+            # run report the diagnostic table as fresh drift of this very file (non-idempotent).
+            *[f"| `{i['skill']}` | {i['key']} |" for i in key_issues],
+            "",
+            "> 未命中键在此**不加反引号**：本文件自身也在扫描范围内，写成寻址键会把这张诊断表当成本文件的新漂移。",
+            "",
+        ]
 
     unregistered = calibration["unregistered_skills"]
     assert isinstance(unregistered, list)
@@ -1691,7 +1730,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         except OSError as exc:
             print(f"error: cannot write calibration map: {exc}", file=sys.stderr)
             return 2
-        print(f"校准表已更新：{args.emit_map}")
+        # `--format json` must keep stdout parseable as the single report object, so the notice
+        # goes to stderr in that mode (callers pipe stdout straight into a JSON parser).
+        print(
+            f"校准表已更新：{args.emit_map}",
+            file=sys.stderr if args.format == "json" else sys.stdout,
+        )
     if args.format == "json":
         print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     else:

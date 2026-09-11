@@ -39,9 +39,9 @@
 - **生成**：只由检查器 `--emit-map` 生成，禁止手工编辑状态列：
 
 ```bash
-python3 skills/crwu-audit-skill-maintainer/scripts/check_audit_skill_mappings.py \
+python3 scripts/check_audit_skill_mappings.py \
   --repo-root . --catalog <本次 crwu-dws 快照> --max-age-hours <H> \
-  --emit-map skills/crwu-audit-skill-maintainer/references/07-kb-skill-map.md
+  --emit-map <本技能目录>/references/07-kb-skill-map.md
 ```
 
 - **同步时机**：`audit`/`create`/`repair`/`remap` 每个模式收尾都要刷新一次；多次校准会向「校准历史」追加行（新→旧），不覆盖旧行。

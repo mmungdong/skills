@@ -36,7 +36,7 @@ Skill 已存在，但目录名、frontmatter、references、适用边界、二�
 | 字段 | 要求 |
 | --- | --- |
 | `mode` | `audit/create/repair/remap`；可由用户意图确定 |
-| `repo_root` | source repo；默认当前仓库，但必须验证存在 `skills/crwu-audit/` |
+| `repo_root` | source repo；默认当前仓库，但必须验证存在 skills 根下的 `crwu-audit/` |
 | `catalog` | 粘贴目录树、DWS snapshot 或 node-index；create/remap 还需在线刷新 |
 | `axis` | 创建或定向修复时为 `asset` 或 `business` |
 | `canonical_label` | 一级资产或一级业务标签；不得传细分对象冒充一级标签 |

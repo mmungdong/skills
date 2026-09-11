@@ -100,5 +100,5 @@ crwu h3yun session bind --token '<JWT>'
 
 ## 更多
 
-命令与细节见 `docs/cli-manual.md`；登录成功后即可使用 `skills/h3yun-query`
+命令与细节以 `crwu scheme` 为准；登录成功后即可使用 `h3yun-query` 技能
 进行查询。

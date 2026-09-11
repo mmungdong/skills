@@ -22,14 +22,14 @@
 | 知识库 | 本次最新目录 | **唯一路径事实** |
 | 路由机制 | `crwu-audit/SKILL.md` + `references/08-union-dispatch-rules.md` | 分发与并集规则 |
 | 路由参考 | `references/02`~`06` classification + `references/07-skill-registry.md` | 标签与登记 |
-| 真实 Skill | `skills/crwu-audit-*` 目录及其 references | 实现事实 |
+| 真实 Skill | skills 根下的 `crwu-audit*` 技能目录及其 references | 实现事实 |
 | 分类表 | `03-asset-classification.md` / `04-business-classification.md` | 一级标签与二级识别规则 |
 
 ## 步骤三：四类检查
 
 ### 1 路由机制是否完好
 
-- router 入口 `skills/crwu-audit/SKILL.md` 存在（否则 `ROUTER_FILE_MISSING`）。
+- router 入口 `<skills 根>/crwu-audit/SKILL.md` 存在（否则 `ROUTER_FILE_MISSING`）。
 - router 依赖的路由 reference 齐全：`00-input-and-route-profile.md`、`02`~`06` classification、`07-skill-registry.md`、`08-union-dispatch-rules.md`、`10-capability-gap-proposal.md`、`99-maintenance.md`（缺失 → `ROUTER_REFERENCE_MISSING`）。
 - router 命名的 `NN-*.md` 必须真实存在于 `crwu-audit/references/`；叶子自有 reference 名（`00-applicability.md`/`01-kb-assembly.md`/`02-review-focus.md`）不计（未解析 → `ROUTER_REFERENCE_UNRESOLVED`）。
 - 知识库里出现的轴，并集规则必须真的会加载它：资产 → `asset_skills`，业务 → `business_skills`（缺 → `ROUTER_AXIS_UNDISPATCHED`）。
@@ -74,7 +74,7 @@
 ## 命令
 
 ```bash
-python3 skills/crwu-audit-skill-maintainer/scripts/check_audit_skill_mappings.py \
+python3 scripts/check_audit_skill_mappings.py \
   --repo-root <source-repo> \
   --catalog <本次 crwu-dws 刷新落地的快照> \
   --max-age-hours 1 \

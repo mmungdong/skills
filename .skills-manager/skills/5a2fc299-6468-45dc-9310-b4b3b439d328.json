@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "5a2fc299-6468-45dc-9310-b4b3b439d328",
+  "path": "crwu-init",
+  "path_key": "crwu-init",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://gitee.com/mengdong123/crwu-ai",
+    "subpath": "skills/crwu-init",
+    "branch": null
+  }
+}

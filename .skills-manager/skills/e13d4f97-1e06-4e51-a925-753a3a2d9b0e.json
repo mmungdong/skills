@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "e13d4f97-1e06-4e51-a925-753a3a2d9b0e",
+  "path": "crwu-audit-biz-judicial-liquidation-compensation",
+  "path_key": "crwu-audit-biz-judicial-liquidation-compensation",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://gitee.com/mengdong123/crwu-ai",
+    "subpath": "skills/crwu-audit-biz-judicial-liquidation-compensation",
+    "branch": null
+  }
+}

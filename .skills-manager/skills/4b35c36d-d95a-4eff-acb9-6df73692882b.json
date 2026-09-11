@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "4b35c36d-d95a-4eff-acb9-6df73692882b",
+  "path": "crwu-audit-biz-tax-history",
+  "path_key": "crwu-audit-biz-tax-history",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://gitee.com/mengdong123/crwu-ai",
+    "subpath": "skills/crwu-audit-biz-tax-history",
+    "branch": null
+  }
+}

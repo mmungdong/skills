@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "fd6b722a-7820-48c8-a910-4b3e44c58d0b",
+  "path": "crwu-audit-skill-maintainer",
+  "path_key": "crwu-audit-skill-maintainer",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://gitee.com/mengdong123/crwu-ai",
+    "subpath": "skills/crwu-audit-skill-maintainer",
+    "branch": null
+  }
+}

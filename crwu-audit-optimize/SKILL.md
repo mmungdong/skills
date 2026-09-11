@@ -36,11 +36,11 @@ description: >-
 3. 改动只落在 references/00 §2 分层地图对应的**唯一落点文件**并提交源仓；运行时部署由用户 skills
    管理机制负责（维护者/agent 不直接写/ln/cp/rm `~/.skills-manager`、`~/.dsh`、`~/.workbuddy` 等运行时目录）；
    登记 design/README/CHANGELOG（99 流程）。**涉及知识库的变更
-   必须同批完成"装配表/目录地图/叶子引用"三件套同步**（判定见 references/00 §2.1）：
-   新增、改名、移动或调整装配范围 → 同步叶子 `references/01-kb-assembly.md` 与知识库 `00-总纲/目录地图`；
+   必须同批完成"装配表/知识库登记/叶子引用"三件套同步**（判定见 references/00 §2.1）：
+   新增、改名、移动或调整装配范围 → 同步叶子 `references/01-kb-assembly.md` 与知识库 `00-总纲/README`（总纲与维护契约；该库当前缺 `目录地图`，见 references/00 §2.1 gap）；
    知识库正文编辑本身按知识库维护流程另办——禁止留下"文件已动、指针没跟"的中间态。
 4. 引用协议（与 crwu-audit 族实时引用协议一致，见 design-audit-live-kb-protocol §2 R1–R5）：技能正文引用
-   一律写 RULE/CHK 编号 + 库内层级路径寻址键（如 `00-总纲/目录地图`、`06-规则库/…`），不写知识库名称、
+   一律写 RULE/CHK 编号 + 库内层级路径寻址键（如 `00-总纲/执行契约/01-调度器-SKILL总纲`、`06-规则库/…`），不写知识库名称、
    不写本地根路径字面、不写 nodeId；正文经 crwu-dws 实时下载后只读引用（出处=本次下载文件:行号+exportedAt），
    文件零缓存；禁止个人绝对路径与「KB/…」式前缀省略；本技能 references 内容均自带寻址键与落点，不回指 skills/README。
 
@@ -55,15 +55,15 @@ description: >-
    → 监管覆盖（→ `04-监管覆盖`）。提取细则见 references/01 §2。
 3. 若存在历史审核产物（审核意见单 json/md、路由路径、适用规则集快照），先读——它就是"现状基线"，
    证明当前命中面与真实审核的差异。
-4. 机器辅助定位（`kb_tool.py validate`；可执行路径由部署环境注入，源仓=`tools/kb/kb_tool.py`）：
-   - `kb_tool.py validate --skill-root <源仓 skills> --skill-root <运行时真身 skills>` → 引用卫生与漂移线索
+4. 机器辅助定位（调用 `crwu-audit-skill-maintainer` 技能的 `scripts/kb_tool.py validate`；两技能安装在同一 skills 根下，下同）：
+   - `python3 "$SKILLS_ROOT/crwu-audit-skill-maintainer/scripts/kb_tool.py" validate --skill-root <源仓 skills> --skill-root <运行时真身 skills>` → 引用卫生与漂移线索
      （旧树残留标记 / `KB/…` 省略号 / 已废止的本地根引用与 `CRWU_KB_ROOT` 常量 / "三不写" lint：
      禁知识库名称、禁本地正文路径字面、禁 nodeId 常量）；
    - 库内现有 RULE/CHK 段与装配面：读叶子 `references/01-kb-assembly.md` 的路径键，用 `crwu-dws`
      按库内层级路径**实时下载**正文后只读核对（出处=本次下载文件:行号+exportedAt；清单外零下载）；
    - 不依赖任何本地知识库索引：本地根模型已废止，正文唯一来源为钉钉知识库。
 5. 人工对照（知识库治理/目录文件经 crwu-dws 按库内层级路径实时下载后只读核对）：
-   `00-总纲/目录地图`（画像→目录）、叶子 `references/01-kb-assembly.md`（技能→知识库寻址键）、
+   `00-总纲/README`（知识库总纲与维护契约：§2 目录、§3 三处登记要求）、叶子 `references/01-kb-assembly.md`（技能→知识库寻址键）、
    `00-总纲/治理/回测报告-真实案例覆盖` 与 `00-总纲/治理/校准案例记录`（案例 A/B 已覆盖点）、
    `crwu-audit/references/07-skill-registry.md`（唯一注册表，`available`/`pending`/`profile-only`）；
    maintainer 的实时校准表 `crwu-audit-skill-maintainer/references/07-kb-skill-map.md`（知识库↔Skill 映射现状）。
@@ -106,12 +106,12 @@ description: >-
 
 1. 按 references/00 §2 顺序改文件（先落点文件、后引用它的上层文件）；涉及知识库变更时按 §2.1
    同步义务执行（新增/改名/移动知识库文件或调整装配范围 → 同步叶子 `references/01-kb-assembly.md` 与
-   知识库 `00-总纲/目录地图`）；
+   知识库 `00-总纲/README` 的登记行）；
 2. 源仓提交；运行时部署/校验由用户 skills 管理机制执行（本侧不直接写运行时目录）；
-3. 登记：design §4/§7 + `skills/README.md` + `docs/CHANGELOG.md`（99 流程；改词表另提示复跑画像基线）；
+3. 登记：源仓的设计文档、技能清单与变更纪要（99 流程；改词表另提示复跑画像基线）；
    涉及知识库规则文件的改动同步更新批次 README/进度总表对应行；
 4. 校验回归（**全过才算完成**）：
-   - `kb_tool.py validate --skill-root <源仓 skills> --skill-root <运行时真身 skills>` error=0
+   - `python3 "$SKILLS_ROOT/crwu-audit-skill-maintainer/scripts/kb_tool.py" validate --skill-root <源仓 skills> --skill-root <运行时真身 skills>` error=0
      （引用卫生 + "三不写" lint：禁知识库名称 / 禁本地正文路径字面 / 禁 nodeId 常量 / 禁旧树残留）；
    - 受影响叶子装配表（含本单画像）两跑导出 `diff` 为空（可复现）；
    - 案例回归：BG8169 / 300673 输出不劣化；
