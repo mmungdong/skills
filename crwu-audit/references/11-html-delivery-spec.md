@@ -499,6 +499,7 @@ AuditResult 是单一事实源。字段名推荐统一使用英文 camelCase，�
 
 ### 10.3 呈现行为
 
+- 页面必须提供覆盖全部交付区域的左侧目录，目录项使用页内锚点直达对应区域；窄屏可转为顶部横向目录，打印时不输出目录。
 - 问题卡片必须保持规则、材料、差异、结论、修改的固定顺序。
 - 高、中、低可使用颜色辅助，但文字标签必须同时存在，不得仅靠颜色表达。
 - 专业审核轨迹使用 details/summary 默认折叠；无脚本时仍可访问。
@@ -600,6 +601,7 @@ AuditResult 是单一事实源。字段名推荐统一使用英文 camelCase，�
 
 ### 13.3 renderer
 
+- 页面外壳与 CSS 的唯一模板位于本技能 `template/audit-report.html`；renderer 只装配受控内容与嵌入 JSON，不在脚本内复制第二份页面样式。
 - 采用确定性模板：同一输入、同一版本应得到语义一致的输出。
 - 仅进行转义、受控标签映射、格式化、排序展示和折叠布局。
 - 不纠正业务内容；发现不合法数据时拒绝发布并返回校验错误。
@@ -654,45 +656,9 @@ AuditResult 是单一事实源。字段名推荐统一使用英文 camelCase，�
 
 ## 附录 B HTML 页面骨架
 
-以下骨架只规定语义结构与数据挂载点，不规定大量 CSS。实际模板应通过自动转义和受控组件渲染动态内容。
+完整可运行骨架已独立为本技能 `template/audit-report.html`，它是页面结构、左侧目录、响应式布局、基础视觉样式与 A4 打印样式的唯一模板。模板保留三个受控挂载点：`{{document_title}}`、`{{report_content}}`、`{{embedded_json}}`；分别由 renderer 注入经转义的标题、按本规范顺序生成的完整交付正文和安全序列化的同源 AuditResult JSON。
 
-```html
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>审核意见 - {{projectId}}</title>
-  <style>/* 内嵌基础样式与 A4 打印样式 */</style>
-</head>
-<body>
-<main id="audit-report">
-  <header id="project-info">...</header>
-  <section id="summary">...</section>
-  <section id="actionable-issues">
-    <!-- 按 high / medium / low 渲染五段式问题卡片 -->
-  </section>
-  <section id="manual-confirmation-items">...</section>
-  <section id="audit-basis">
-    <nav aria-label="审核规则地图">...</nav>
-    <table><!-- 实际使用规则与知识库文件 --></table>
-  </section>
-  <section id="review-comparison">...</section>
-  <section id="scope-and-not-checked">...</section>
-  <details id="professional-trail">
-    <summary>专业审核轨迹</summary>
-    <section id="rule-snapshot">...</section>
-    <section id="adjudications">...</section>
-    <section id="check-records">...</section>
-    <section id="comprehensive-comparison">...</section>
-  </details>
-  <footer id="file-trace">...</footer>
-</main>
-<script id="audit-result" type="application/json">{{safeJson}}</script>
-<script>/* 可选的内嵌交互；不得改写审核数据 */</script>
-</body>
-</html>
-```
+模板目录必须覆盖项目信息、审核结果概览、需要处理的问题、需要人工确认事项、本次审核依据、人工复核对照、AI 审核评分卡、审核范围与未检查项、专业审核轨迹、文件追溯信息。正文仍由 renderer 按 §3、§6.3 与 §10.2 确定性装配；抽离模板不得改变、减少或重写任何 AuditResult 字段和业务信息。
 
 ## 附录 C 发布前验收清单
 
@@ -728,11 +694,11 @@ AuditResult 是单一事实源。字段名推荐统一使用英文 camelCase，�
 
 | 项 | 口径 |
 | --- | --- |
-| owner | 本文件（`crwu-audit/references/11-html-delivery-spec.md`）为**送达与交付层正文**的唯一事实源；`crwu-audit/SKILL.md` 只保留指针与门禁要点，不复制本节正文。 |
+| owner | 本文件（`references/11-html-delivery-spec.md`）为**送达与交付层规范正文**的唯一事实源；`template/audit-report.html` 为页面结构与 CSS 的唯一模板；`SKILL.md` 只保留指针与门禁要点，不复制本节正文。 |
 | 文本属性 | 本规范为项目内部正式规范（非知识库规则正文），随技能版本维护：修改须同批更新 `SKILL.md` 指针、`99-maintenance.md` owner 映射、源仓变更纪要与相关测试。 |
 | 与其他契约的关系 | 交付/送达口径以本规范为准；防幻觉与统计台账口径仍按 `00-总纲/执行契约/02-防幻觉协议执行细则`、`00-总纲/执行契约/03-审核统计与台账规范` 经本次 `crwu-dws` 实时下载后执行。原始 v0.4 内部逻辑（逐条裁定、复核对照、记录清单）由本规范 §6/§7/§8/§11 承接；其字段契约以实现层 JSON Schema 为准。 |
 | 运行时加载时机 | 审核运行不预读；阶段一定稿冻结后、阶段二对照与交付（router 步骤 14）时读取；渲染层按 §13.3 确定性渲染。 |
-| 参考实现（已落地） | 本规范的机器可校验 Schema 与参考实现位于本技能 `scripts/`（随技能安装）：`audit_result.schema.json`（§9 字段契约）、`audit_delivery.py`（`validate` 校验 §9.4/§11.1/§12.2 + `render` 确定性渲染 §10）、`test_audit_delivery.py`（§13.4 契约测试 21 项）、`examples/audit-result.sample.json`（示意样例）、`README.md`（用法与维护规则）。渲染器版本记于 `fileTrace.rendererVersion`。 |
+| 参考实现（已落地） | 本规范的机器可校验 Schema 与参考实现随技能安装：`scripts/audit_result.schema.json`（§9 字段契约）、`scripts/audit_delivery.py`（`validate` 校验 §9.4/§11.1/§12.2 + `render` 确定性渲染 §10）、`template/audit-report.html`（独立页面模板与 CSS）、`scripts/test_audit_delivery.py`（§13.4 契约测试）、`scripts/examples/audit-result.sample.json`（示意样例）、`scripts/README.md`（用法与维护规则）。渲染器版本记于 `fileTrace.rendererVersion`。 |
 | 叶子职责 | 叶子只输出结构化 findings／证据／裁定／检查记录（§13.1），不生成页面、不定义最终字段、不写最终员工报告。 |
 
 ### 14.1 编排层调用映射（脚本接入）

@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{document_title}}</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #667085;
+      --brand: #244a75;
+      --brand-soft: #edf4fb;
+      --surface: #ffffff;
+      --surface-subtle: #f7f9fc;
+      --line: #d8dee9;
+      --line-strong: #b7c1cf;
+      --high: #a92d28;
+      --high-soft: #fff2f0;
+      --medium: #9a5b08;
+      --medium-soft: #fff8e8;
+      --low: #60630b;
+      --low-soft: #f8f9e9;
+      --shadow: 0 10px 30px rgba(23, 32, 51, 0.07);
+      --radius: 10px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 20px; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #eef2f7;
+      font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+    }
+    a { color: inherit; }
+    a:focus-visible, summary:focus-visible {
+      outline: 3px solid rgba(36, 74, 117, 0.35);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    .skip-link {
+      position: fixed;
+      left: 16px;
+      top: -80px;
+      z-index: 30;
+      padding: 10px 14px;
+      color: #fff;
+      background: var(--brand);
+      border-radius: 6px;
+      text-decoration: none;
+    }
+    .skip-link:focus { top: 12px; }
+    .report-shell {
+      display: grid;
+      grid-template-columns: 232px minmax(0, 980px);
+      gap: 28px;
+      align-items: start;
+      justify-content: center;
+      padding: 28px;
+    }
+    .report-catalog {
+      position: sticky;
+      top: 24px;
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+      padding: 18px 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .catalog-title {
+      margin: 0 8px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+    }
+    .report-catalog ol { margin: 0; padding: 0; list-style: none; counter-reset: report-section; }
+    .report-catalog li { margin: 2px 0; counter-increment: report-section; }
+    .report-catalog a {
+      display: grid;
+      grid-template-columns: 2.1em 1fr;
+      gap: 5px;
+      min-height: 40px;
+      align-items: center;
+      padding: 7px 8px;
+      color: #344054;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 13px;
+      line-height: 1.35;
+      transition: color 160ms ease, background-color 160ms ease;
+    }
+    .report-catalog a::before {
+      content: counter(report-section, decimal-leading-zero);
+      color: #8792a2;
+      font-variant-numeric: tabular-nums;
+    }
+    .report-catalog a:hover, .report-catalog a:focus-visible {
+      color: var(--brand);
+      background: var(--brand-soft);
+    }
+    .report-page {
+      min-width: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+    main { max-width: 980px; margin: 0 auto; padding: 42px 46px 56px; }
+    header, main > section, main > details, footer { scroll-margin-top: 24px; }
+    h1 { margin: 0 0 8px; color: #142c48; font-size: 28px; line-height: 1.3; letter-spacing: 0.01em; }
+    h2 {
+      margin: 38px 0 16px;
+      padding: 0 0 9px;
+      color: #173b62;
+      border-bottom: 2px solid #9cb3cb;
+      font-size: 20px;
+      line-height: 1.35;
+    }
+    h3 { margin: 0 0 8px; color: #203b59; font-size: 17px; }
+    h4 { margin: 16px 0 8px; color: #526174; font-size: 13px; }
+    section { margin-bottom: 18px; }
+    p { margin: 8px 0; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 10px 0 16px; }
+    th, td {
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      overflow-wrap: anywhere;
+      font-size: 13px;
+    }
+    tr > :first-child { border-left: 1px solid var(--line); }
+    thead tr:first-child > *, tbody:first-child tr:first-child > * { border-top: 1px solid var(--line); }
+    thead th { color: #344054; background: #edf2f7; font-weight: 700; }
+    table.kv th { width: 128px; color: #475467; background: var(--surface-subtle); }
+    tbody tr:nth-child(even) td { background: #fbfcfe; }
+    ul { margin: 8px 0; padding-left: 20px; }
+    li { margin: 5px 0; break-inside: avoid; }
+    .issue-card {
+      padding: 17px 18px;
+      margin: 18px 0;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--line-strong);
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(23, 32, 51, 0.05);
+      break-inside: avoid;
+    }
+    .issue-card.sev-high { border-left-color: var(--high); background: linear-gradient(90deg, var(--high-soft), #fff 90px); }
+    .issue-card.sev-medium { border-left-color: var(--medium); background: linear-gradient(90deg, var(--medium-soft), #fff 90px); }
+    .issue-card.sev-low { border-left-color: var(--low); background: linear-gradient(90deg, var(--low-soft), #fff 90px); }
+    .issue-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 5px 0 12px; }
+    .issue-meta span, .stage li span { margin-right: 10px; }
+    .issue-meta .severity-label {
+      padding: 1px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .sev-high .severity-label { color: var(--high); border-color: var(--high); }
+    .sev-medium .severity-label { color: var(--medium); border-color: var(--medium); }
+    .sev-low .severity-label { color: var(--low); border-color: var(--low); }
+    .issue-id, .rule-id, .file, .locator, .kb-path, .exported-at, .role { color: var(--muted); }
+    .quote, .excerpt { font-style: italic; }
+    .problem-label { margin-right: 6px; color: #344054; font-weight: 700; }
+    .empty { margin: 8px 0; padding: 10px 12px; color: var(--muted); background: var(--surface-subtle); border-radius: 6px; }
+    .rule-map { padding: 2px 16px 12px; background: var(--surface-subtle); border: 1px solid var(--line); border-radius: 8px; }
+    .rule-map h4 { margin-top: 14px; }
+    .banner {
+      padding: 12px 14px;
+      color: #7d231f;
+      background: var(--high-soft);
+      border: 1px solid #dcaaa7;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    details {
+      padding: 12px 14px;
+      margin: 18px 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--surface-subtle);
+    }
+    summary { min-height: 32px; cursor: pointer; color: #264b73; font-weight: 700; }
+    .footer-meta { color: var(--muted); font-size: 12px; }
+    .badge {
+      display: inline-block;
+      padding: 4px 9px;
+      margin: 0 6px 12px 0;
+      color: #31506f;
+      background: var(--brand-soft);
+      border: 1px solid #b9cde1;
+      border-radius: 999px;
+      font-size: 12px;
+    }
+
+    @media (max-width: 960px) {
+      body { background: var(--surface); }
+      .report-shell { display: block; padding: 0; }
+      .report-catalog {
+        position: static;
+        max-height: none;
+        padding: 12px 14px;
+        border-width: 0 0 1px;
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .report-catalog ol { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; }
+      .report-catalog li { flex: 0 0 auto; }
+      .report-catalog a { min-height: 44px; padding-inline: 10px; }
+      .report-page { border: 0; border-radius: 0; box-shadow: none; }
+      main { padding: 28px 22px 44px; }
+    }
+
+    @media (max-width: 600px) {
+      body { font-size: 16px; }
+      main { padding-inline: 16px; }
+      h1 { font-size: 24px; }
+      h2 { margin-top: 32px; font-size: 19px; }
+      th, td { padding: 8px; font-size: 12px; }
+      table.kv th { width: 104px; }
+      .issue-card { padding: 14px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .report-catalog a { transition: none; }
+    }
+
+    @media print {
+      @page { size: A4; margin: 16mm 15mm 18mm; }
+      body { background: #fff; color: #000; font-size: 10pt; }
+      .skip-link, .report-catalog { display: none; }
+      .report-shell, .report-page { display: block; padding: 0; border: 0; box-shadow: none; }
+      main { max-width: none; padding: 0; }
+      h2 { color: #000; border-bottom-color: #555; }
+      details { border: none; padding: 0; background: #fff; }
+      details > summary { display: none; }
+      details:not([open]) > *:not(summary) { display: block; }
+      .issue-card { box-shadow: none; break-inside: avoid; }
+      .issue-card.sev-high, .issue-card.sev-medium, .issue-card.sev-low { background: #fff; }
+      thead { display: table-header-group; }
+      th, td { border-color: #777; }
+      a[href]:after { content: ""; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#audit-report">跳至审核正文</a>
+  <div class="report-shell">
+    <nav class="report-catalog" aria-label="报告目录">
+      <p class="catalog-title">报告目录</p>
+      <ol>
+        <li><a href="#project-info">项目信息</a></li>
+        <li><a href="#summary">审核结果概览</a></li>
+        <li><a href="#actionable-issues">需要处理的问题</a></li>
+        <li><a href="#manual-confirmation-items">人工确认事项</a></li>
+        <li><a href="#audit-basis">本次审核依据</a></li>
+        <li><a href="#review-comparison">人工复核对照</a></li>
+        <li><a href="#ai-scorecard">AI 审核评分卡</a></li>
+        <li><a href="#scope-and-not-checked">范围与未检查项</a></li>
+        <li><a href="#professional-trail">专业审核轨迹</a></li>
+        <li><a href="#file-trace">文件追溯信息</a></li>
+      </ol>
+    </nav>
+    <div class="report-page">
+{{report_content}}
+    </div>
+  </div>
+  <script id="audit-result" type="application/json">{{embedded_json}}</script>
+</body>
+</html>

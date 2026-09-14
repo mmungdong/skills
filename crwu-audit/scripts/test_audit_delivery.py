@@ -25,6 +25,7 @@ import audit_delivery as delivery  # noqa: E402
 
 MODULE_PATH = Path(__file__).resolve().parent / "audit_delivery.py"
 SAMPLE_PATH = Path(__file__).resolve().parent / "examples" / "audit-result.sample.json"
+TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "template" / "audit-report.html"
 
 REGION_ORDER = [
     "project-info",
@@ -33,6 +34,7 @@ REGION_ORDER = [
     "manual-confirmation-items",
     "audit-basis",
     "review-comparison",
+    "ai-scorecard",
     "scope-and-not-checked",
     "professional-trail",
     "file-trace",
@@ -50,6 +52,8 @@ def module_string_constants() -> set:
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             values.add(node.value)
+    if TEMPLATE_PATH.is_file():
+        values.update(text_nodes(TEMPLATE_PATH.read_text(encoding="utf-8")))
     return values
 
 
@@ -159,6 +163,23 @@ class AuditResultRenderTest(unittest.TestCase):
             positions.append(index)
         self.assertEqual(sorted(positions), positions, "区域顺序必须符合 §3 交付结构")
 
+    def test_renderer_uses_standalone_template_with_sidebar_catalog(self):
+        self.assertTrue(TEMPLATE_PATH.is_file(), "HTML 模板必须独立存放在 skill/template/")
+        template = TEMPLATE_PATH.read_text(encoding="utf-8")
+        self.assertIn("{{report_content}}", template)
+        self.assertIn('class="report-catalog"', template)
+        self.assertIn('aria-label="报告目录"', template)
+        self.assertIn('class="report-shell"', template)
+        for region in REGION_ORDER:
+            self.assertIn('href="#{0}"'.format(region), template, "目录缺少区域 {0}".format(region))
+            self.assertIn('href="#{0}"'.format(region), self.document, "渲染结果缺少目录项 {0}".format(region))
+
+    def test_sidebar_is_responsive_and_hidden_for_print(self):
+        template = TEMPLATE_PATH.read_text(encoding="utf-8")
+        self.assertIn("position: sticky", template)
+        self.assertIn("@media (max-width: 960px)", template)
+        self.assertRegex(template, re.compile(r"@media print\s*\{.*?\.report-catalog\s*\{[^}]*display:\s*none", re.S))
+
     def test_self_contained_and_offline_safe(self):
         for token in ("http://", "https://", "<link", "script src", "@import"):
             self.assertNotIn(token, self.document)
@@ -208,6 +229,15 @@ class AuditResultRenderTest(unittest.TestCase):
         # 嵌入 JSON 必须安全转义 <，全文只能有本页面自己的一个结束标签
         self.assertEqual(1, document.count("</script>"))
         self.assertIn("\\u003cscript>alert(1)", document)
+
+    def test_dynamic_content_cannot_trigger_template_placeholder_replacement(self):
+        result = load_sample()
+        result["issues"][0]["problemDescription"] = "保留原文 {{embedded_json}} 与 {{report_content}}"
+        document = delivery.render(result)
+        visible_issues = re.findall(r'<span class="problem-description">(.*?)</span>', document, re.S)
+        self.assertIn("保留原文 {{embedded_json}} 与 {{report_content}}", visible_issues)
+        self.assertEqual(1, document.count('<main id="audit-report">'))
+        self.assertEqual(1, document.count('<script id="audit-result" type="application/json">'))
 
     def test_empty_lists_show_explicit_message(self):
         result = load_sample()

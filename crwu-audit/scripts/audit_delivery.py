@@ -24,7 +24,8 @@ import re
 import sys
 from pathlib import Path
 
-RENDERER_VERSION = "renderer/1.0.0"
+RENDERER_VERSION = "renderer/1.1.0"
+TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "template" / "audit-report.html"
 SCHEMA_VERSION_PREFIX = "1."
 
 SEVERITY_LABEL = {"high": "高", "medium": "中", "low": "低"}
@@ -1189,55 +1190,6 @@ def _adjudication_row(record) -> str:
     )
 
 
-STYLE = """
-:root { --line:#c9ced6; --muted:#5b6472; --high:#b3261e; --medium:#a15c00; --low:#6b6b00; }
-* { box-sizing: border-box; }
-body { margin:0; padding:0; color:#1b1f24; background:#fff;
-  font-family: "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",-apple-system,"Segoe UI",sans-serif; line-height:1.55; }
-main { max-width: 980px; margin: 0 auto; padding: 24px 20px 48px; }
-h1 { font-size: 22px; margin: 0 0 4px; }
-h2 { font-size: 18px; margin: 28px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--line); }
-h3 { font-size: 16px; margin: 0 0 6px; }
-h4 { font-size: 13px; margin: 10px 0 6px; color: var(--muted); }
-section { margin-bottom: 14px; }
-table { border-collapse: collapse; width: 100%; }
-th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; font-size: 13px; }
-thead th { background:#f4f6f8; }
-table.kv th { width: 96px; background:#f7f8fa; }
-ul { margin: 6px 0; padding-left: 18px; }
-li { margin: 4px 0; break-inside: avoid; }
-.issue-card { border:1px solid var(--line); border-left-width:5px; border-radius:4px; padding:12px 14px; margin:14px 0; break-inside: avoid; }
-.issue-card.sev-high { border-left-color: var(--high); }
-.issue-card.sev-medium { border-left-color: var(--medium); }
-.issue-card.sev-low { border-left-color: var(--low); }
-.issue-meta span, .stage li span { margin-right:10px; }
-.issue-meta .severity-label { font-weight:700; border:1px solid var(--line); border-radius:3px; padding:0 6px; }
-.sev-high .severity-label { color: var(--high); border-color: var(--high); }
-.sev-medium .severity-label { color: var(--medium); border-color: var(--medium); }
-.sev-low .severity-label { color: var(--low); border-color: var(--low); }
-.issue-id, .rule-id, .file, .locator, .kb-path, .exported-at, .role { color: var(--muted); }
-.quote, .excerpt { font-style: italic; }
-.problem-label { font-weight:600; margin-right:6px; }
-.empty { color: var(--muted); margin:6px 0; }
-.rule-map h4 { margin-top:14px; }
-.banner { background:#fbf3f2; border:1px solid var(--high); border-radius:4px; padding:8px 10px; font-size:13px; }
-details { border:1px dashed var(--line); border-radius:4px; padding:8px 10px; margin:10px 0; }
-summary { cursor: pointer; font-weight:600; }
-.footer-meta { color: var(--muted); font-size:12px; }
-.badge { display:inline-block; border:1px solid var(--line); border-radius:3px; padding:0 6px; margin-right:6px; font-size:12px; }
-@media print {
-  @page { size: A4; margin: 16mm 15mm 18mm; }
-  main { max-width: none; padding: 0; }
-  details { border:none; padding:0; }
-  details > summary { display:none; }
-  details:not([open]) > *:not(summary) { display: block; }
-  .issue-card { break-inside: avoid; }
-  thead { display: table-header-group; }
-  a[href]:after { content: ""; }
-}
-"""
-
-
 def render(result: dict, print_trail: bool = None) -> str:
     """确定性渲染：文本节点只来自受控标签或输入数据，不生成新的业务句子。"""
     rendered_result = json.loads(json.dumps(result, ensure_ascii=False))
@@ -1246,9 +1198,9 @@ def render(result: dict, print_trail: bool = None) -> str:
     # sourceDigest：渲染输入的规范化摘要（摘要字段自身清零）
     file_trace["sourceDigest"] = ""
     file_trace["embeddedJsonDigest"] = ""
+    file_trace["rendererVersion"] = RENDERER_VERSION
     source_digest = sha256_hex(canonical_json(rendered_result))
     file_trace["sourceDigest"] = source_digest
-    file_trace["rendererVersion"] = RENDERER_VERSION
 
     embedded_digest = sha256_hex(canonical_json(rendered_result))
     file_trace["embeddedJsonDigest"] = embedded_digest
@@ -1278,15 +1230,6 @@ def render(result: dict, print_trail: bool = None) -> str:
     )
 
     parts = []
-    parts.append("<!doctype html>")
-    parts.append('<html lang="zh-CN">')
-    parts.append("<head>")
-    parts.append('<meta charset="utf-8">')
-    parts.append('<meta name="viewport" content="width=device-width,initial-scale=1">')
-    parts.append("<title>{0}</title>".format(_text("审核意见")))
-    parts.append("<style>{0}</style>".format(STYLE))
-    parts.append("</head>")
-    parts.append("<body>")
     parts.append('<main id="audit-report">')
 
     # 01 项目信息
@@ -1512,10 +1455,29 @@ def render(result: dict, print_trail: bool = None) -> str:
     parts.append("</footer>")
 
     parts.append("</main>")
-    parts.append('<script id="audit-result" type="application/json">{0}</script>'.format(payload))
-    parts.append("</body>")
-    parts.append("</html>")
-    return "\n".join(parts) + "\n"
+    report_content = "\n".join(parts)
+    template = TEMPLATE_PATH.read_text(encoding="utf-8")
+    template_values = {
+        "document_title": _text("审核意见"),
+        "report_content": report_content,
+        "embedded_json": payload,
+    }
+    placeholders_seen = set()
+
+    def inject_template_value(match):
+        key = match.group(1)
+        placeholders_seen.add(key)
+        return template_values[key]
+
+    document = re.sub(
+        r"\{\{(document_title|report_content|embedded_json)\}\}",
+        inject_template_value,
+        template,
+    )
+    missing = set(template_values) - placeholders_seen
+    if missing:
+        raise ValueError("HTML 模板缺少挂载点：{0}".format("、".join(sorted(missing))))
+    return document
 
 
 # --------------------------------------------------------------------------- #

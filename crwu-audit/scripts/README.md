@@ -7,8 +7,9 @@
 | --- | --- | --- |
 | `audit_result.schema.json` | AuditResult JSON Schema（draft 2020-12）：必填、枚举、条件必填、路径安全 | §9.1–§9.3 |
 | `audit_delivery.py` | 校验器 + renderer（纯标准库，无第三方依赖）；`validate` / `digest` / `render` 子命令 | §9.4、§10、§11.1、§12.2 |
+| `template/audit-report.html`（从技能根目录定位） | 独立 HTML/CSS 模板：左侧目录、响应式正文、折叠轨迹与 A4 打印 | §10、附录 B |
 | `examples/audit-result.sample.json` | 【示意】样例（数值与名称为占位，禁止当真值使用） | §9.3 |
-| `test_audit_delivery.py` | 24 项契约测试（Schema 语义、门禁、证据链、统计可重算、隐私、渲染确定性、转义、打印、空态） | §13.4 |
+| `test_audit_delivery.py` | 契约测试（Schema 语义、门禁、证据链、统计可重算、隐私、模板、目录、渲染确定性、转义、打印、空态） | §13.4 |
 
 ## 用法
 
@@ -64,8 +65,9 @@ python3 scripts/test_audit_delivery.py
 - **单一事实源**：只从 AuditResult 渲染；不接受额外业务输入，不新增/删除/合并/改写任何结论；
 - **确定性**：同一输入 + 同一 renderer 版本 → 逐字节一致输出（`render` 可重复比对）；
 - **自包含**：CSS 内嵌，无外链字体/样式/脚本/图片，无遥测；动态内容全部 HTML 转义；
-- **九区结构**：项目信息 → 审核结果概览 → 需要处理的问题 → 需要人工确认事项 → 本次审核依据（含规则地图）
-  → 人工复核对照 → 审核范围与未检查项 → 专业审核轨迹（`details` 默认折叠）→ 文件追溯信息；
+- **独立模板**：页面结构和 CSS 只维护在 `template/audit-report.html`；桌面端左侧目录可直达全部区域，窄屏转为顶部目录，打印时隐藏；
+- **完整结构**：项目信息 → 审核结果概览 → 需要处理的问题 → 需要人工确认事项 → 本次审核依据（含规则地图）
+  → 人工复核对照 → AI 审核评分卡 → 审核范围与未检查项 → 专业审核轨迹（`details` 默认折叠）→ 文件追溯信息；
 - **问题卡片**：规则 → 材料 → 差异 → 结论 → 修改 固定顺序，严重程度**文字标签 + 颜色**并存；
 - **A4 打印**：`@page { size: A4; margin: 16mm 15mm 18mm; }`、卡片 `break-inside: avoid`、表头跨页重复，
   黑白可读；`renderPolicy.printTrail=true` 时轨迹默认展开；
