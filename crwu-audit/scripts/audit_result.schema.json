@@ -644,7 +644,25 @@
           "type": "object"
         },
         "knowledgeBaseFiles": {
-          "type": "array"
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "exportedAt"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!/)(?![A-Za-z]:)(?!~)(?!file://)"
+              },
+              "exportedAt": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     },

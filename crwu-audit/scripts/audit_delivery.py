@@ -188,6 +188,8 @@ IN_FILE_RESOLUTION_LABEL = {
     "L-unclosed": "复核答复称已改 · 被审件未落地",
     "L-uncheckable": "材料缺失或不可读 · 未能核验",
 }
+# 受控占位标签：无在件位置时不得留空白单元格（送达规范 §10.3）
+IN_FILE_ABSENT_LABEL = "未做在件核验（材料不可及或超出本次范围）"
 
 
 # --------------------------------------------------------------------------- #
@@ -513,6 +515,25 @@ def validate(result: dict, rendered: bool = False, expect_renderer: bool = False
                 "{0}.usageCount 必须可由明细重算（应为 {1}）".format(where, expected_usage)
             )
 
+    # knowledgeBaseFiles（§5.3 相对路径；渲染器按 path 字段显示文件名）
+    kb_files = audit_basis.get("knowledgeBaseFiles")
+    if not isinstance(kb_files, list):
+        errors.append("auditBasis.knowledgeBaseFiles 必须是数组")
+    else:
+        for index, item in enumerate(kb_files):
+            where = "auditBasis.knowledgeBaseFiles[{0}]".format(index)
+            if not isinstance(item, dict):
+                errors.append("{0} 必须是对象".format(where))
+                continue
+            if not _is_nonempty_str(item.get("path")):
+                errors.append(
+                    "{0}.path 不得为空（渲染器按 path 显示知识库文件路径；形如 kbRelativePath 的别名会导致只显示时间）".format(where)
+                )
+            elif not _check_relative_path(str(item.get("path"))):
+                errors.append("{0}.path 必须是知识库相对路径".format(where))
+            if not _is_nonempty_str(item.get("exportedAt")):
+                errors.append("{0}.exportedAt 不得为空".format(where))
+
     # reviewComparison（§6）
     comparison = result.get("reviewComparison") or {}
     status = comparison.get("status")
@@ -654,6 +675,18 @@ def validate(result: dict, rendered: bool = False, expect_renderer: bool = False
             errors.append("professionalTrail.{0} 必须是数组".format(field))
     if not isinstance(trail.get("comprehensiveComparison"), dict):
         errors.append("professionalTrail.comprehensiveComparison 必须是对象")
+    for index, record in enumerate(trail.get("adjudications") or []):
+        where = "professionalTrail.adjudications[{0}]".format(index)
+        if not isinstance(record, dict):
+            errors.append("{0} 必须是对象".format(where))
+            continue
+        if not (_is_nonempty_str(record.get("recordId")) or _is_nonempty_str(record.get("chkId"))):
+            errors.append("{0}.recordId 不得为空（渲染器按 recordId 显示编号，缺失将导致裁定表编号列空白）".format(where))
+        if not (_is_nonempty_str(record.get("itemRef")) or _is_nonempty_str(record.get("item"))
+                or _is_nonempty_str(record.get("checkItem"))):
+            errors.append("{0}.itemRef 不得为空（渲染器按 itemRef 显示条目，缺失将导致裁定表条目列空白）".format(where))
+        if not (_is_nonempty_str(record.get("ruling")) or _is_nonempty_str(record.get("result"))):
+            errors.append("{0} 必须给出 ruling 或 result（缺失将导致裁定列空白）".format(where))
     check_record_ids = set()
     for index, record in enumerate(trail.get("checkRecords") or []):
         where = "professionalTrail.checkRecords[{0}]".format(index)
@@ -1148,13 +1181,13 @@ def _reviewer_only_item(item) -> str:
         ("定位", evidence.get("locator")),
         ("原文摘录", evidence.get("quote")),
         ("在件核验", IN_FILE_RESOLUTION_LABEL.get(resolution, resolution)),
-        ("被审件文件", in_file.get("file", "")),
-        ("被审件定位", in_file.get("locator", "")),
+        ("被审件文件", in_file.get("file") or IN_FILE_ABSENT_LABEL),
+        ("被审件定位", in_file.get("locator") or IN_FILE_ABSENT_LABEL),
         ("处理", item.get("handling")),
     ]
     if resolution == "L-unclosed":
-        rows.insert(6, ("答复文件", closure.get("file", "")))
-        rows.insert(7, ("答复定位", closure.get("locator", "")))
+        rows.insert(6, ("答复文件", closure.get("file", "") or IN_FILE_ABSENT_LABEL))
+        rows.insert(7, ("答复定位", closure.get("locator", "") or IN_FILE_ABSENT_LABEL))
     return (
         "<h4>{0}</h4><table class=\"kv\">{1}</table>"
     ).format(_text(item.get("title")), _rows(rows))
@@ -1183,10 +1216,13 @@ def _check_record_row(record) -> str:
 
 
 def _adjudication_row(record) -> str:
+    ruling = record.get("ruling")
+    if not _is_nonempty_str(ruling):
+        ruling = RESULT_LABEL.get(record.get("result"), record.get("result"))
     return "<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>".format(
-        _text(record.get("recordId")),
-        _text(record.get("itemRef") or record.get("item")),
-        _text(RESULT_LABEL.get(record.get("result"), record.get("result"))),
+        _text(record.get("recordId") or record.get("chkId")),
+        _text(record.get("itemRef") or record.get("item") or record.get("checkItem")),
+        _text(ruling),
     )
 
 
@@ -1326,7 +1362,7 @@ def render(result: dict, print_trail: bool = None) -> str:
         parts.append(
             "<ul>"
             + "".join(
-                "<li>{0}{1}</li>".format(_span("kb-path", item.get("path")), _span("exported-at", item.get("exportedAt")))
+                "<li>{0}{1}</li>".format(_span("kb-path", item.get("path") or item.get("kbRelativePath")), _span("exported-at", item.get("exportedAt")))
                 for item in kb_files
             )
             + "</ul>"

@@ -149,6 +149,80 @@ class AuditResultValidationTest(unittest.TestCase):
         errors = delivery.validate(result)
         self.assertTrue(any("reasonCode 取值非法" in error for error in errors), errors)
 
+    def test_knowledge_base_files_require_path_and_exported_at(self):
+        """渲染器按 path 显示知识库文件名；误用 kbRelativePath 等别名会只显示时间。"""
+        result = load_sample()
+        result["auditBasis"]["knowledgeBaseFiles"] = [
+            {"kbRelativePath": "06-规则库/某规则", "exportedAt": "2026-09-10T09:00:00+08:00"}
+        ]
+        errors = delivery.validate(result)
+        self.assertTrue(any("knowledgeBaseFiles[0].path" in error for error in errors), errors)
+
+        result = load_sample()
+        result["auditBasis"]["knowledgeBaseFiles"] = [{"path": "06-规则库/某规则"}]
+        errors = delivery.validate(result)
+        self.assertTrue(any("knowledgeBaseFiles[0].exportedAt" in error for error in errors), errors)
+
+        result = load_sample()
+        result["auditBasis"]["knowledgeBaseFiles"] = [
+            {"path": "/Users/example/kb/rule.md", "exportedAt": "2026-09-10T09:00:00+08:00"}
+        ]
+        errors = delivery.validate(result)
+        self.assertTrue(any("knowledgeBaseFiles[0].path" in error for error in errors), errors)
+
+        result = load_sample()
+        result["auditBasis"]["knowledgeBaseFiles"] = ["06-规则库/某规则"]
+        errors = delivery.validate(result)
+        self.assertTrue(any("knowledgeBaseFiles[0] 必须是对象" in error for error in errors), errors)
+
+    def test_knowledge_base_file_path_is_rendered(self):
+        result = load_sample()
+        document = delivery.render(result)
+        self.assertIn("06-规则库/M-数据对齐-勾稽与一致性/清单-数据校对.md", document)
+        self.assertNotIn('<span class="kb-path"></span>', document)
+
+    def test_adjudication_row_keys_are_required(self):
+        """裁定表按 recordId/itemRef/ruling(result) 渲染；三列齐缺会整表空白。"""
+        base = load_sample()
+        self.assertTrue(base["professionalTrail"]["adjudications"])
+
+        result = load_sample()
+        result["professionalTrail"]["adjudications"] = [{"applicability": "适用", "executed": True}]
+        errors = delivery.validate(result)
+        self.assertTrue(any("adjudications[0].recordId" in error for error in errors), errors)
+        self.assertTrue(any("adjudications[0].itemRef" in error for error in errors), errors)
+        self.assertTrue(any("adjudications[0] 必须给出" in error for error in errors), errors)
+
+        result = load_sample()
+        result["professionalTrail"]["adjudications"] = ["不是对象"]
+        errors = delivery.validate(result)
+        self.assertTrue(any("adjudications[0] 必须是对象" in error for error in errors), errors)
+
+    def test_adjudication_row_falls_back_to_legacy_keys(self):
+        result = load_sample()
+        result["professionalTrail"]["adjudications"] = [
+            {"chkId": "CHK-LEGACY", "checkItem": "旧键位条目", "ruling": "不符合：示例"}
+        ]
+        errors = delivery.validate(result)
+        self.assertFalse([e for e in errors if "adjudications" in e], errors)
+        document = delivery.render(result)
+        self.assertIn("CHK-LEGACY", document)
+        self.assertIn("旧键位条目", document)
+        self.assertIn("不符合：示例", document)
+        self.assertNotIn('<td></td><td></td><td></td>', document)
+
+    def test_missing_in_file_evidence_is_not_rendered_blank(self):
+        """L-uncheckable 无在件位置时应显示受控标签，不得留空白单元格（§10.3）。"""
+        result = load_sample()
+        item = result["reviewComparison"]["reviewerOnlyItems"][0]
+        item["inFileResolution"] = "L-uncheckable"
+        item.pop("inFileEvidence", None)
+        errors = delivery.validate(result)
+        self.assertFalse([e for e in errors if "inFileEvidence" in e], errors)
+        document = delivery.render(result)
+        self.assertIn(delivery.IN_FILE_ABSENT_LABEL, document)
+        self.assertNotIn('<td class="value"></td>', document)
+
 
 class AuditResultRenderTest(unittest.TestCase):
     def setUp(self):
