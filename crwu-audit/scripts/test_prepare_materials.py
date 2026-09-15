@@ -11,6 +11,8 @@
 3. 同名消歧 —— 定稿与送审稿同名时，工作版必须两份都在、来源可区分、不得静默覆盖。
 4. 「值不可得」登记 —— 无缓存值的公式格单独计数，不混进"数据缺失"。
 5. 源材料目录只读 —— 运行后源目录文件集合不变。
+6. 表格遍历四层边界 —— 扫描边界按**有值格**（不按 dimension、也不按"存在的格"）；
+   声明用区远大于有值区时登记表格规范提示；单表超规模上限时记 capability gap 并跳过。
 """
 from __future__ import annotations
 
@@ -470,6 +472,180 @@ class PrepareMaterialsContractTest(unittest.TestCase):
 
         rebuilt = openpyxl.load_workbook(self.case / "工作版/格式.xlsx")
         self.assertEqual("0.00%", rebuilt.active["A1"].number_format)
+
+
+    # ---- 6 隐藏区区段展开（防"隐藏列漏剔"假阳性）------------------------
+    @staticmethod
+    def _hide_columns(path: Path, sheet_name: str, lo: int, hi: int):
+        """按 raw XML 写 `<col min lo max hi hidden="1"/>`（含区段，覆盖假阳性根因场景）。
+
+        注意：openpyxl 的 `ws.column_dimensions` 只把该区段挂在**首列**上，这正是此前
+        `_hidden_metadata()` 漏剔区段内其余列、把人工隐藏内容读进工作版的根因。
+        """
+        import re
+        tmp = path.with_suffix(".hide.xlsx")
+        with zipfile.ZipFile(path) as zin, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+            names = dict(re.findall(
+                r'<sheet[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"',
+                zin.read("xl/workbook.xml").decode("utf-8")))
+            rels = {}
+            for rel in re.finditer(r"<Relationship\b([^>]*)/?>",
+                                   zin.read("xl/_rels/workbook.xml.rels").decode("utf-8")):
+                a = dict(re.findall(r'([A-Za-z_:][\w:.-]*)\s*=\s*"([^"]*)"', rel.group(1)))
+                if a.get("Id") and a.get("Target"):
+                    rels[a["Id"]] = a["Target"]
+            target = rels[names[sheet_name]].lstrip("/")
+            target = target if target.startswith("xl/") else "xl/" + target
+            for item in zin.infolist():
+                data = zin.read(item.filename)
+                if item.filename == target:
+                    text = data.decode("utf-8")
+                    cols = '<cols><col min="{0}" max="{1}" hidden="1"/></cols>'.format(lo, hi)
+                    text = re.sub(r"<sheetData", cols + "<sheetData", text, count=1)
+                    data = text.encode("utf-8")
+                zout.writestr(item, data)
+        shutil.move(str(tmp), str(path))
+
+    def test_hidden_column_range_is_fully_excluded(self):
+        """隐藏列**区段**（min<max）内每一列都不得进入工作版（此前只剔首列 → 假阳性）。"""
+        import openpyxl
+        d = self.src / "定稿"
+        d.mkdir()
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "汇总表"
+        ws["A1"] = "序号"
+        ws["J1"] = "隐藏段首列"
+        ws["K1"] = "隐藏段第二列(曾漏剔)"
+        wb.save(d / "区段隐藏.xlsx")
+        self._hide_columns(d / "区段隐藏.xlsx", "汇总表", lo=10, hi=11)   # J:K
+
+        self._run()
+
+        rebuilt = openpyxl.load_workbook(self.case / "工作版/区段隐藏.xlsx")
+        rws = rebuilt["汇总表"]
+        self.assertEqual("序号", rws["A1"].value)
+        self.assertIsNone(rws["J1"].value, "区段内首列 J 应被剔除")
+        self.assertIsNone(rws["K1"].value, "区段内其余列 K 也必须被剔除（本条即历史失效点）")
+        meta = [i for i in self._inventory() if i["name"] == "区段隐藏.xlsx"][0]["workbook"]
+        self.assertIn("K", meta["hiddenMeta"]["hiddenCols"]["汇总表"])
+
+    # ---- 7 表名含首尾空格时隐藏区引用审计仍须命中 ------------------------
+    def test_hidden_reference_audit_matches_sheet_name_with_spaces(self):
+        """表名含首尾空格时，隐藏**列**引用仍须被审计命中（此前恒返回 0 处 → 漏报）。"""
+        import openpyxl
+        d = self.src / "定稿"
+        d.mkdir()
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "报价表  "          # 尾空格，历史失效场景
+        ws["A1"] = 1
+        ws["B1"] = "=A1*2"
+        wb.save(d / "空格表名.xlsx")
+        self._hide_columns(d / "空格表名.xlsx", "报价表  ", lo=1, hi=1)   # 隐藏 A 列
+
+        self._run()
+
+        meta = [i for i in self._inventory() if i["name"] == "空格表名.xlsx"][0]["workbook"]
+        self.assertGreaterEqual(meta["hiddenRefsCount"], 1,
+                                "表名含空格时不得漏报隐藏列引用（归一化缺失的回归）")
+        self.assertTrue(any(r["kind"] == "引用隐藏列" for r in meta["hiddenRefs"]), meta["hiddenRefs"])
+
+    # ---- 8 虚增 dimension 不得拖垮遍历 ----------------------------------
+    def test_inflated_dimension_does_not_force_full_sheet_scan(self):
+        """`dimension` 被虚增（如 A1:Y1048575）时，遍历边界须取**真实用区**。"""
+        import openpyxl
+        d = self.src / "定稿"
+        d.mkdir()
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws["A1"] = "合计"
+        wb.save(d / "虚增维度.xlsx")
+        p = d / "虚增维度.xlsx"
+        tmp = p.with_suffix(".dim.xlsx")
+        with zipfile.ZipFile(p) as zin, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                data = zin.read(item.filename)
+                if item.filename.startswith("xl/worksheets/sheet"):
+                    text = data.decode("utf-8")
+                    text = text.replace('ref="A1"', 'ref="A1:Y1048575"', 1)
+                    data = text.encode("utf-8")
+                zout.writestr(item, data)
+        shutil.move(str(tmp), str(p))
+
+        src_ws = openpyxl.load_workbook(p).active
+        max_row, max_col = self.module._sheet_bounds(src_ws)
+        self.assertEqual((1, 1), (max_row, max_col), "虚增 dimension 不得被当作遍历边界")
+
+        self._run()      # 仍须在正常时间内完成
+        meta = [i for i in self._inventory() if i["name"] == "虚增维度.xlsx"][0]["workbook"]
+        self.assertEqual(1, meta["sheets"][0]["maxRow"])
+
+
+    # ---- 9 表格遍历的四层边界（B1 扫描 / B2 内容 / B3 异常 / B4 护栏） ------
+    def test_orphan_styled_cell_does_not_force_full_sheet_scan(self):
+        """游离格式格（`value=None` 但有样式）落在末行：边界须按**有值格**定，并登记规范提示。
+
+        真实失效（2026-302135-LX9619-BG8634 的 `4-15-3无形-其他`）：
+        944 个存在格中 697 个纯格式 + 1 个游离在第 1048575 行
+        → 重建循环 26,214,375 次、单表 56 s；隐藏引用审计再扫满 → 70 s。
+        只按"存在的格"（`_cells`）定界**仍会踩到**——那个游离格就在 `_cells` 里。
+        """
+        import openpyxl
+        from openpyxl.styles import Font
+        d = self.src / "定稿"
+        d.mkdir()
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws["A1"] = "合计"
+        ws["A2"] = 42
+        ws.cell(row=1048575, column=6).font = Font(bold=True)      # 只有样式、没有值
+        wb.save(d / "游离格式格.xlsx")
+
+        src_ws = openpyxl.load_workbook(d / "游离格式格.xlsx").active
+        self.assertEqual((2, 1), self.module._sheet_bounds(src_ws),
+                         "边界须按有值格定，不得被游离格式格顶到 1048575 行")
+
+        self._run()                                                 # 且须在正常时间内完成
+
+        meta = [i for i in self._inventory() if i["name"] == "游离格式格.xlsx"][0]["workbook"]
+        self.assertEqual(2, meta["sheets"][0]["maxRow"])
+        anomalies = [a for a in self._payload().get("sheetAnomalies", [])
+                     if a["path"].endswith("游离格式格.xlsx")]
+        self.assertEqual(1, len(anomalies), "声明用区远大于实际有值区时须登记表格规范提示")
+        self.assertGreater(anomalies[0]["orphanRows"], 1000)
+        self.assertIn("1048575", anomalies[0]["declaredDim"])
+        self.assertEqual(1, anomalies[0]["styleOnlyCells"])
+        self.assertEqual({"maxRow": 1048575, "maxCol": 6}, meta["sheets"][0]["declaredSpan"],
+                         "声明用区与有值区不一致时须一并留痕（低于 B3 阈值时更要有）")
+        rebuilt = openpyxl.load_workbook(self.case / "工作版/游离格式格.xlsx", data_only=True)
+        self.assertEqual("合计", rebuilt.active["A1"].value)
+        self.assertEqual(42, rebuilt.active["A2"].value)
+
+    def test_oversized_sheet_records_capability_gap_not_silence(self):
+        """单表有值格超上限：记 capability gap 并跳过该表，其余表继续，不得静默。"""
+        import openpyxl
+        orig = self.module.MAX_SHEET_CELLS
+        self.module.MAX_SHEET_CELLS = 5
+        try:
+            d = self.src / "定稿"
+            d.mkdir()
+            wb = openpyxl.Workbook()
+            big = wb.active
+            big.title = "超限表"
+            for i in range(1, 11):
+                big.cell(row=i, column=1, value=i)
+            wb.create_sheet("正常表")["A1"] = "ok"
+            wb.save(d / "超限.xlsx")
+            self._run()
+        finally:
+            self.module.MAX_SHEET_CELLS = orig
+
+        rec = [i for i in self._inventory() if i["name"] == "超限.xlsx"][0]
+        self.assertTrue(rec.get("capabilityGaps"), "超限必须记 capability gap，不得静默跳过")
+        self.assertIn("未完整处理", " ".join(rec["capabilityGaps"]))
+        self.assertEqual(["正常表"], [s["sheet"] for s in rec["workbook"]["sheets"]],
+                         "超限表不进工作版，其余表照常处理")
 
 
 if __name__ == "__main__":

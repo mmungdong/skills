@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crwu.local/schema/gap-analysis/1.0.0",
+  "title": "GapAnalysis",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "reportId",
+    "project",
+    "baselines",
+    "summary",
+    "reviewerOnlyItems",
+    "repairPlans",
+    "renderPolicy"
+  ],
+  "properties": {
+    "schemaVersion": {"type": "string", "pattern": "^1\\."},
+    "reportId": {"type": "string", "pattern": "^GAP-[A-Za-z0-9_-]+-[0-9]{8}$"},
+    "project": {"type": "object"},
+    "baselines": {"type": "object"},
+    "summary": {"type": "object"},
+    "reviewerOnlyItems": {"type": "array", "items": {"type": "object"}},
+    "repairPlans": {"type": "array", "items": {"type": "object"}},
+    "renderPolicy": {
+      "type": "object",
+      "required": ["offline", "printA4"],
+      "properties": {
+        "offline": {"const": true},
+        "printA4": {"const": true}
+      }
+    }
+  }
+}

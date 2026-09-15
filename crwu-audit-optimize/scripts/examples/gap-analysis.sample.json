@@ -1,0 +1,116 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportId": "GAP-BG8169-20260915",
+  "generatedAt": "2026-09-15T16:00:00+08:00",
+  "project": {
+    "projectId": "BG8169",
+    "auditResult": "审核意见.BG8169.json",
+    "reviewFiles": ["人工复核意见.xlsx"],
+    "finalMaterials": ["评估报告-最终版.docx", "市场法测算.xlsx"]
+  },
+  "baselines": {
+    "auditSnapshot": {
+      "manifest": "knowledge/.crwu-manifest.jsonl",
+      "verifiedSameProject": true,
+      "exportedAt": "2026-09-15T09:00:00+08:00"
+    },
+    "currentKbSnapshot": {
+      "readOnly": true,
+      "checkedAt": "2026-09-15T15:00:00+08:00"
+    }
+  },
+  "comparison": {
+    "overlap": 6,
+    "aiOnly": 3,
+    "divergent": 1
+  },
+  "summary": {
+    "reviewerOnly": 3,
+    "actionableMisses": 2,
+    "resolved": 1,
+    "uncheckable": 0,
+    "questionable": 0,
+    "repairPlans": 2
+  },
+  "reviewerOnlyItems": [
+    {
+      "gapId": "L-01",
+      "title": "市场比较案例时间修正依据不足",
+      "status": "L-open",
+      "reviewerEvidence": {"file": "人工复核意见.xlsx", "location": "问题清单!B12", "excerpt": "时间修正依据不充分"},
+      "finalDocumentVerification": {"file": "市场法测算.xlsx", "location": "案例表!H8", "result": "仍存在"},
+      "executionTrace": [
+        {"stage": "input", "status": "passed", "evidence": "材料清单#2"},
+        {"stage": "profile", "status": "passed", "evidence": "route_profile.methods=市场法"},
+        {"stage": "routing", "status": "passed", "evidence": "已加载房地产与交易处置"},
+        {"stage": "assembly", "status": "passed", "evidence": "manifest 已下载清单-M-市场法"},
+        {"stage": "knowledge", "status": "failed", "evidence": "CHK-MKT-012 内容不足"}
+      ],
+      "rootCauses": [{"code": "K2", "role": "primary", "evidence": "历史与当前正文均缺判断标准"}],
+      "linkedFixIds": ["FIX-KB-01"]
+    },
+    {
+      "gapId": "L-02",
+      "title": "土地用途限制条件未核验",
+      "status": "L-open",
+      "reviewerEvidence": {"file": "人工复核意见.xlsx", "location": "问题清单!B18", "excerpt": "未核验规划用途限制"},
+      "finalDocumentVerification": {"file": "评估报告-最终版.docx", "location": "第45页", "result": "仍存在"},
+      "executionTrace": [
+        {"stage": "knowledge", "status": "passed", "evidence": "CHK-RE-021 已装载"},
+        {"stage": "skill", "status": "failed", "evidence": "未定义四端交叉核验"},
+        {"stage": "output", "status": "not_applicable", "evidence": "上游未形成 finding"}
+      ],
+      "rootCauses": [{"code": "S2", "role": "primary", "evidence": "知识已有但 Skill 未执行"}],
+      "linkedFixIds": ["FIX-SKILL-01"]
+    },
+    {
+      "gapId": "L-03",
+      "title": "报告未披露土地剩余年限",
+      "status": "L-resolved",
+      "reviewerEvidence": {"file": "人工复核意见.xlsx", "location": "问题清单!B21", "excerpt": "补充剩余年限"},
+      "finalDocumentVerification": {"file": "评估报告-最终版.docx", "location": "第31页", "result": "已整改"},
+      "executionTrace": [],
+      "rootCauses": [{"code": "H", "role": "primary", "evidence": "最终版已落实"}],
+      "linkedFixIds": []
+    }
+  ],
+  "repairPlans": [
+    {
+      "fixId": "FIX-KB-01",
+      "title": "补充时间修正依据充分性检查点",
+      "type": "kb_manual",
+      "executionMode": "manual_only",
+      "approvalState": "pending",
+      "sourceGapIds": ["L-01"],
+      "target": {"kbPath": "06-规则库/评估方法/市场法/清单-M-市场法", "anchor": "CHK-MKT-012"},
+      "changeSpec": {
+        "currentGap": "缺少时间修正依据充分性的证据、步骤、标准和例外",
+        "method": "扩写现有 CHK-MKT-012",
+        "contentOutline": ["适用条件", "必取证据", "检查步骤", "判断标准", "异常输出", "例外"]
+      },
+      "registrations": ["条目计数变化时更新批次 README"],
+      "completionEvidence": "用户确认 FIX-KB-01 已完成并允许只读复核",
+      "dependencies": [],
+      "validation": ["锚点唯一", "原漏检案例回归"]
+    },
+    {
+      "fixId": "FIX-SKILL-01",
+      "title": "补充土地用途限制四端交叉核验",
+      "type": "skill_ai",
+      "executionMode": "ai_after_approval",
+      "approvalState": "approved",
+      "sourceGapIds": ["L-02"],
+      "target": {"skillFile": "crwu-audit-asset-realestate/references/02-review-focus.md", "anchor": "CHK-RE-021"},
+      "changeSpec": {
+        "currentGap": "未定义权证、规划条件、报告披露、测算假设四端交叉核验",
+        "method": "补充执行步骤和证据要求",
+        "contentOutline": ["四端取证", "冲突判断", "输出证据"]
+      },
+      "registrations": ["源仓变更纪要"],
+      "completionEvidence": "相关测试和原漏检回归通过",
+      "dependencies": [],
+      "validation": ["quick_validate", "kb_tool validate", "原漏检案例回归"]
+    }
+  ],
+  "renderPolicy": {"offline": true, "printA4": true}
+}

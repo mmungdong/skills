@@ -252,19 +252,12 @@
   },
   "externalDataVerification": {
     "baseDate": "2025-06-30",
-    "unavailableDeclaration": "本次未配置 / 未认证 万得，相关条目未经双源复核。",
     "sources": [
       {
         "source": "同花顺 iFinD",
         "configured": true,
         "authenticated": true,
-        "note": "服务端授权；逐项取数时点见下表"
-      },
-      {
-        "source": "万得",
-        "configured": false,
-        "authenticated": false,
-        "note": "连接器未配置；相关条目未经双源复核"
+        "note": "取数路径：DeepSeek Harness 的 ifind-finance-data 技能；逐项取数时点与口径见下表"
       }
     ],
     "checks": [
@@ -280,11 +273,6 @@
             "asOfDate": "2025-06-30",
             "caliber": "10 年期国债到期收益率·基准日单点",
             "available": true
-          },
-          {
-            "source": "万得",
-            "value": "—",
-            "available": false
           }
         ],
         "deviationAgainst": "同花顺 iFinD",
@@ -308,11 +296,6 @@
             "asOfDate": "2025-06-30",
             "caliber": "2024 年年报·归母净利润",
             "available": true
-          },
-          {
-            "source": "万得",
-            "value": "—",
-            "available": false
           }
         ],
         "deviationAgainst": "—",
@@ -332,11 +315,6 @@
         "sources": [
           {
             "source": "同花顺 iFinD",
-            "value": "无覆盖",
-            "available": false
-          },
-          {
-            "source": "万得",
             "value": "无覆盖",
             "available": false
           }

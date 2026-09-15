@@ -1,5 +1,6 @@
 # crwu-dws references/00 —— 目录快照 schema / 渲染规则（M1/M2/M3 共用）
 
+> 版本 v3（2026-09-15，随 crwu-dws v0.6：文档节点新增 `extension`/`contentType`，作为 M2/M3 取数通道分流的唯一判据）。
 > 版本 v2（2026-09-08，随 crwu-dws v0.3：落点迁移到目录缓存层 + M3 支持）。
 > 本文档随技能安装（源仓与运行时双份）；
 > 改前先读本技能 `SKILL.md` §5–§6（缓存与实时性模型）与 `references/02`。
@@ -37,7 +38,9 @@
     {
       "nodeId": "…",                                // 服务端 ID，名称永不替代 ID
       "name": "…",                                  // 原文
-      "type": "folder|adoc|axls|able|appt|adraw|amind|未知原值",
+      "type": "folder|file|未知原值",                 // 服务端 nodeType；文档一律为 file，不承载格式信息
+      "extension": "adoc",                          // ★ 取数通道判据（服务端真实返回；文档节点必记，缺席=null）
+      "contentType": "ALIDOC",                      // 辅助判据（adoc=ALIDOC，原生文件=OTHER）；缺席=null
       "parentFolderId": null,                        // 根层=null
       "depth": 0,                                    // 根层=0
       "children": [ … ],                             // 嵌套子节点（同构）
@@ -54,7 +57,9 @@
 ## 3. 字段语义（不变量）
 
 - **名称不替代 ID**：所有在线操作只认 `nodeId`；`name` 仅展示与本地文件命名（M2）。
-- **type 白名单**：`folder/adoc/axls/able/appt/adraw/amind`；白名单外原样保留字符串，禁止归类/猜测。
+- **type 只表示节点形态**：服务端 `nodeType` 取值 `folder|file`；文档一律 `file`，**不承载格式信息**，禁止用它推断是 adoc 还是原生文件。
+- **`extension` 是取数通道的唯一判据（v0.6 起强制记录）**：文档节点必须写服务端真实返回的 `extension`（`adoc`/`md`/`pdf`/`docx`/`xlsx`/`exe`…）与 `contentType`（`ALIDOC`/`OTHER`…）；缺失记 `null`，**不推断、不按名称后缀猜测**（节点名不带后缀，`.md` 只是导出后的本地文件名）。M2/M3 按它分流（SKILL.md §2/§6.2）：`adoc` → `doc +export`；`md`/`txt` → `drive +download`；其余 → `skipped`。
+- **白名单外原样保留**：`extension`/`contentType` 未识别时原样记原值字符串，禁止归类或猜测。
 - **parentFolderId**：根层 null；服务端未提供 → null 且 evidence 注明，不推断补值。
 - **hasChildren**：只提示，**不作剪枝依据**；与实际 `+node-list` 展开不一致时如实记录，不当作失败也不反向剪枝。
 - **complete 判定**：仅当遍历全部完成、`failures=[]`、每页 `autoPageComplete=true` → `stats.complete=true`；否则 false。
@@ -73,7 +78,7 @@
 └─ <根层文档名>                    axls
 ```
 
-- folder 名后接 `/` 且行尾标 `[F]`；文档行尾标类型；未知 type 原样输出 + 注"type 未识别"。
+- folder 名后接 `/` 且行尾标 `[F]`；文档行尾标 **`extension`**（不是 `type`——`type` 恒为 `file`，标它等于没标）；`extension` 为 `null` 时输出 `ext:未提供`，未识别时原样输出 + 注"类型未识别"。
 - 树内条目不得超出快照 nodes；快照是事实源、树是视图；库身份标注（workspaceId/spaceType/时间/统计/complete）不允许缺失（多库并存不混库）。
 
 ## 5. 摘要口径（聊天展示）

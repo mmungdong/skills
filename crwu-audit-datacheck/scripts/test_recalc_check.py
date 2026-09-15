@@ -205,6 +205,64 @@ class RecalcCheckContractTest(unittest.TestCase):
         self.assertEqual(1, r["summary"]["notRecomputable"], r)
         self.assertIn("除零", r["notRecomputable"][0]["reason"])
 
+    def test_type_mismatch_is_not_recomputable_and_does_not_crash(self):
+        """类型不匹配（日期 − 文本）→ 标「未重算(类型不匹配)」，**不得打穿整表**。
+
+        真实失效（2026-302135-LX9619-BG8634 的 3-资产基础法.xlsx）：
+        `_arith` 抛裸 `TypeError: unsupported operand type(s) for -: 'datetime.datetime'
+        and 'str'`，而 `run()` 只捕获 `Unavailable` → 整个 datacheck 崩溃、该表完全不可用。
+        Excel 对同式报 `#VALUE!`，故这属"该格不可重算"，不是引擎缺陷。
+        """
+        import datetime
+        import openpyxl
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws["A1"] = datetime.datetime(2024, 1, 1)
+        ws["B1"] = "文本"
+        ws["C1"] = "=A1-B1"
+        r = self._run(wb)
+        self.assertEqual(1, r["summary"]["notRecomputable"], r)
+        self.assertIn("类型不匹配", r["notRecomputable"][0]["reason"])
+        self.assertEqual(0, r["summary"]["engineErrors"], "类型问题是该格不可重算，不该计成引擎异常")
+        self.assertEqual(0, r["summary"]["mismatched"], "不得猜值比对")
+
+    def test_sum_over_non_numeric_is_not_recomputable_and_does_not_crash(self):
+        """SUM 聚合到非数值（文本/日期）→ 标「未重算」，不得崩溃（`float()` 转换路径）。"""
+        import openpyxl
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws["A1"] = "文本"
+        ws["A2"] = 1
+        ws["B1"] = "=SUM(A1:A2)"
+        r = self._run(wb)
+        self.assertEqual(1, r["summary"]["notRecomputable"], r)
+        self.assertIn("类型不匹配", r["notRecomputable"][0]["reason"])
+
+    def test_unexpected_engine_error_is_counted_and_never_swallowed(self):
+        """非预期异常 → 记 engineError 并入摘要 engineErrors，**不伪装成普通未重算**。
+
+        这是防"兜底把代码缺陷静默化"的反向断言：既有可见的计数，也有逐格标记。
+        """
+        import openpyxl
+        wb = openpyxl.Workbook()
+        wb.active["A1"] = "=1+1"
+        p = self.dir / "boom.xlsx"
+        wb.save(p)
+
+        original = self.module.Evaluator.eval
+        self.module.Evaluator.eval = lambda self, f: (_ for _ in ()).throw(
+            RuntimeError("模拟引擎缺陷"))
+        try:
+            r = self.module.run(str(p))
+        finally:
+            self.module.Evaluator.eval = original
+
+        self.assertEqual(1, r["summary"]["notRecomputable"], r)
+        self.assertEqual(1, r["summary"]["engineErrors"], "非预期引擎异常必须计数暴露")
+        entry = r["notRecomputable"][0]
+        self.assertTrue(entry.get("engineError"))
+        self.assertIn("引擎异常 RuntimeError", entry["reason"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

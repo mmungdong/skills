@@ -208,6 +208,126 @@ class DwsSourceContractTest(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, text)
 
+    # ---- v0.6：按 extension 分流的双取数通道 ----------------------------------
+    #
+    # 缺陷背景（2026-09-15 实测）：知识库文档的 nodeType 恒为 `file`，格式只在
+    # `extension` 里；`dw. doc +export` 仅支持 `extension=adoc`。整改前 M2 对所有
+    # 文档一律调用 `doc +export`，于是 25 个原生 `.md` 正文（整个 `03-评估方法/`）
+    # 每次都必然失败、被记成 failure，且没有任何门禁发现——因为校验只看"路径键
+    # 是否存在"，不看节点类型。以下断言把整改口径钉死。
+
+    def _dws_docs(self) -> dict:
+        names = [
+            "SKILL.md",
+            "references/00-目录快照schema.md",
+            "references/01-审核下载与manifest规范.md",
+            "references/02-缓存与兜底查找规范.md",
+        ]
+        return {
+            name: (SKILLS_ROOT / "crwu-dws" / name).read_text(encoding="utf-8")
+            for name in names
+        }
+
+    @_requires_skill_tree
+    def test_whitelist_adds_read_only_drive_download(self):
+        """候选通道必须显式列入只读白名单，且仍禁止一切写命令。"""
+        text = self._dws_docs()["SKILL.md"]
+
+        self.assertIn("`+download`", text, "drive +download 未进入只读白名单")
+        self.assertIn("drive 域仅", text, "白名单未声明 drive 域边界")
+        # 白名单必须保持"仅"的排他语义：drive 域只放行 +download 一个命令。
+        drive_clause = next(
+            line for line in text.splitlines() if "drive 域仅" in line
+        )
+        self.assertIn("+download", drive_clause)
+        self.assertNotIn("+upload", drive_clause)
+        self.assertNotIn("+move", drive_clause)
+        self.assertNotIn("+delete", drive_clause)
+
+    @_requires_skill_tree
+    def test_channel_is_decided_by_extension_not_by_trial(self):
+        """通道由 extension 判定；明令禁止"先 export 试失败再换通道"的试错取数。"""
+        docs = self._dws_docs()
+        skill = docs["SKILL.md"]
+
+        # SKILL.md 必须给出分流表的三档判据。
+        for term in ("`adoc`", "`md`", "`txt`", "`skipped`"):
+            with self.subTest(term=term):
+                self.assertIn(term, skill)
+
+        # 试错取数必须被显式禁止（否则"必然失败"会被记成偶发 failure）。
+        self.assertIn("试错", skill, "SKILL.md 未禁止试错式取数")
+        self.assertRegex(
+            skill,
+            r"禁止[^\n]*试(错|一次)",
+            "SKILL.md 未写明禁止试错式通道选择",
+        )
+
+        # references/01 必须给出同一张分流表与展开范围口径。
+        m2 = docs["references/01-审核下载与manifest规范.md"]
+        self.assertIn("dws drive +download", m2)
+        self.assertIn("dws doc +export", m2)
+        self.assertIn("channel", m2)
+
+    @_requires_skill_tree
+    def test_unsupported_extension_is_skipped_not_failed(self):
+        """类型不支持是正常结论：必须记 skipped，禁止并入 failure。"""
+        docs = self._dws_docs()
+        skill = docs["SKILL.md"]
+        m2 = docs["references/01-审核下载与manifest规范.md"]
+
+        self.assertIn("skipped", skill)
+        self.assertRegex(
+            skill,
+            r"skipped[^\n]*不(得|是)[^\n]*failure|不(得|是)[^\n]*failure[^\n]*skipped",
+            "SKILL.md 未写明 skipped 不得计入 failure",
+        )
+        # 摘要口径必须把跳过与失败分开统计。
+        self.assertIn("跳过", skill)
+        self.assertIn("skipped", m2)
+        self.assertRegex(
+            m2,
+            r"(不得|禁止)[^\n]*failure",
+            "references/01 未写明 skipped 不得记为 failure",
+        )
+        # 明细表三态齐全：entry / skipped / failure。
+        for kind in ('"kind": "entry"', '"kind": "skipped"', '"kind": "failure"'):
+            with self.subTest(kind=kind):
+                self.assertIn(kind, m2)
+
+    @_requires_skill_tree
+    def test_snapshot_and_node_index_carry_the_channel_discriminator(self):
+        """extension/contentType 必须落快照与索引，否则 M2 快路径无法判通道。"""
+        docs = self._dws_docs()
+        snapshot = docs["references/00-目录快照schema.md"]
+        index = docs["references/02-缓存与兜底查找规范.md"]
+
+        for label, text in (("references/00", snapshot), ("references/02", index)):
+            with self.subTest(doc=label):
+                self.assertIn("extension", text, f"{label} 未记录 extension")
+                self.assertIn("contentType", text, f"{label} 未记录 contentType")
+
+        # 必须写明"缺失时补查 node-get、不按名称后缀猜"。
+        self.assertIn("node-get", index, "references/02 未给出 extension 缺失时的补查口径")
+        self.assertRegex(
+            snapshot + index,
+            r"不(推断|猜|按名称)",
+            "未写明 extension 缺失时不得推断/猜测",
+        )
+
+    @_requires_skill_tree
+    def test_type_field_is_not_used_as_a_format_discriminator(self):
+        """nodeType 恒为 file，不得再当格式判据（整改前的错误假设）。"""
+        snapshot = self._dws_docs()["references/00-目录快照schema.md"]
+
+        self.assertRegex(
+            snapshot,
+            r"type[^\n]*(不承载格式|只表示节点形态)",
+            "references/00 未写明 type 不承载格式信息",
+        )
+        # 渲染规则也必须按 extension 标注，而不是按 type。
+        self.assertIn("ext:", snapshot, "目录树渲染未按 extension 标注")
+
     @_requires_skill_tree
     def test_asset_and_business_leaves_declare_a_first_level_directory_root(self):
         """Every asset/biz leaf must declare one exact recursive first-level root.

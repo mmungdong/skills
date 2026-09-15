@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{report_title}}</title>
+  <style>
+    :root { --ink:#172033; --muted:#667085; --brand:#244a75; --brand-soft:#edf4fb; --surface:#fff; --subtle:#f7f9fc; --line:#d8dee9; --red:#a92d28; --orange:#9a5b08; --blue:#356da8; --purple:#7652a8; --green:#39724f; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:#eef1f5; color:var(--ink); font:14px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif; }
+    .skip-link { position:absolute; left:-999px; }
+    .skip-link:focus { left:12px; top:12px; z-index:2; background:var(--surface); padding:8px; }
+    .shell { max-width:1240px; margin:24px auto; padding:0 20px 48px; }
+    header, section { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:16px; }
+    h1,h2,h3 { line-height:1.35; margin-top:0; }
+    h1 { font-size:26px; margin-bottom:6px; }
+    h2 { font-size:19px; }
+    h3 { font-size:15px; }
+    .subtitle,.muted { color:var(--muted); }
+    .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .stat { padding:13px; background:var(--subtle); border-radius:8px; }
+    .stat strong { display:block; font-size:24px; font-weight:600; }
+    .charts { display:grid; grid-template-columns:1.1fr .9fr; gap:18px; }
+    .chart { height:290px; min-width:0; }
+    #relation-chart { height:390px; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:9px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:#475467; background:var(--subtle); }
+    code { overflow-wrap:anywhere; }
+    .badge { display:inline-block; padding:2px 7px; border-radius:999px; background:var(--brand-soft); white-space:nowrap; }
+    .trace { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .trace-step { padding:5px 8px; border:1px solid var(--line); border-radius:6px; }
+    .trace-step.failed { border-color:var(--red); background:#fff2f0; }
+    .trace-step.passed { border-color:var(--green); }
+    .trace-line { width:18px; height:2px; background:var(--line); }
+    .plan-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .plan { padding:15px; background:var(--subtle); border-left:4px solid var(--blue); break-inside:avoid; }
+    .plan.skill { border-left-color:var(--orange); }
+    .plan dl { display:grid; grid-template-columns:92px 1fr; gap:5px 9px; }
+    .plan dt { color:var(--muted); }
+    .plan dd { margin:0; }
+    textarea { width:100%; min-height:230px; resize:vertical; border:1px solid var(--line); padding:10px; font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    button { border:1px solid var(--line); border-radius:6px; background:var(--surface); padding:7px 11px; cursor:pointer; }
+    button.primary { background:var(--brand); color:#fff; border-color:var(--brand); }
+    .copy-row { display:flex; gap:8px; align-items:center; margin-top:8px; }
+    .manual-only { color:var(--red); font-weight:600; }
+    footer { color:var(--muted); text-align:center; padding:12px; }
+    @media(max-width:960px){ .stats{grid-template-columns:1fr 1fr}.charts,.plan-grid{grid-template-columns:1fr}.shell{padding:0 10px 30px}.chart{height:260px} }
+    @media(max-width:520px){ .stats{grid-template-columns:1fr}.trace-line{display:none}header,section{padding:14px} }
+    @page { size: A4; margin: 14mm; }
+    @media print {
+      body { background:#fff; color:#000; }
+      .shell { max-width:none; margin:0; padding:0; }
+      header,section { border:0; padding:0; margin:0 0 8mm; }
+      button { display:none; }
+      thead { display: table-header-group; }
+      tr,.plan,.chart { break-inside: avoid; }
+      textarea { border:0; min-height:0; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#gap-report">跳至差距分析正文</a>
+  <main id="gap-report" class="shell">{{report_content}}</main>
+  <script id="gap-analysis-data" type="application/json">{{report_payload}}</script>
+  <script>{{echarts_bundle}}</script>
+  <script>{{report_javascript}}</script>
+</body>
+</html>

@@ -21,7 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 import openpyxl
 from openpyxl.utils import column_index_from_string, get_column_letter
@@ -29,6 +29,19 @@ from openpyxl.utils import column_index_from_string, get_column_letter
 
 class Unavailable(Exception):
     """该格无法重算：携带原因（隐藏区/外部引用/不支持函数/解析失败/缺失）。"""
+
+
+class EngineError(Unavailable):
+    """引擎**自身**未能处理该格（非"规则上不支持"）。
+
+    单独成类并在摘要里计数，是为了**不让代码缺陷伪装成"该格数据有问题"**：
+    若兜底把所有异常都并进普通「未重算」，整表静默降级也看不出来。
+    """
+
+
+# 单元格值的类型／数值问题：Excel 自己也会报 `#VALUE!`／`#DIV/0!`，
+# 属"该格不可重算"，不是引擎缺陷。例：`=A1-B1` 而 A1 是日期、B1 是文本。
+_VALUE_ERRORS = (TypeError, ValueError, ArithmeticError, InvalidOperation)
 
 
 # ---------------------------------------------------------------- tokenizer
@@ -138,6 +151,22 @@ class Evaluator:
 
     # ---- 主入口 ----
     def eval(self, formula: str):
+        """统一兜底：任何异常都必须变成「未重算(原因)」，**绝不让单格打断整表**。
+
+        契约（本文件 docstring）要求"解析失败/除零/不支持 → 一律标未重算，绝不判通过、绝不猜值"。
+        整改前只捕获 `Unavailable`，于是 `=A1-B1`（A1 日期、B1 文本）这类 `TypeError`
+        会打穿整个 `run()`（实战：3-资产基础法.xlsx 直接崩，datacheck 整表不可用）。
+        """
+        try:
+            return self._eval(formula)
+        except Unavailable:
+            raise
+        except _VALUE_ERRORS as exc:
+            raise Unavailable(f"类型不匹配或计算失败：{type(exc).__name__}: {exc}") from exc
+        except Exception as exc:                    # 非预期 → 单独成类，摘要中计数暴露
+            raise EngineError(f"引擎异常 {type(exc).__name__}: {exc}") from exc
+
+    def _eval(self, formula: str):
         if re.search(r"\[\d*\]", formula):
             raise Unavailable("引用外部工作簿")
         formula = formula.lstrip()
@@ -350,6 +379,7 @@ def run(workbook: str):
 
     differences, not_recomputable = [], []
     formula_cells = recomputed = matched = mismatched = 0
+    engine_errors = 0
 
     for ws in wbf.worksheets:
         if ws.sheet_state != "visible":
@@ -357,32 +387,48 @@ def run(workbook: str):
         hidden_rows = set(hidden["hiddenRows"].get(ws.title, []))
         hidden_cols = set(hidden["hiddenCols"].get(ws.title, []))
         ev.sheet = ws.title
-        for row in ws.iter_rows():
-            for cell in row:
-                if cell.row in hidden_rows or get_column_letter(cell.column) in hidden_cols:
-                    continue
-                formula = cell.value
-                if not isinstance(formula, str) or not formula.startswith("="):
-                    continue
-                formula_cells += 1
-                cached = wbv[ws.title].cell(cell.row, cell.column).value
-                try:
-                    recalculated = ev.eval(formula)
-                except Unavailable as exc:
-                    not_recomputable.append(
-                        {"sheet": ws.title, "cell": cell.coordinate, "formula": formula,
-                         "reason": str(exc)})
-                    continue
-                recomputed += 1
-                if cached is None or not _close(recalculated, cached):
-                    mismatched += 1
-                    differences.append({
-                        "sheet": ws.title, "cell": cell.coordinate, "formula": formula,
-                        "recalculated": recalculated, "cached": cached,
-                        "note": "重算值与缓存值不一致" if cached is not None else "有公式但无缓存值",
-                    })
-                else:
-                    matched += 1
+        # 只遍历**实际存在**的格（精确集合），不用 `ws.iter_rows()`——后者按声明 dimension
+        # 扫满矩形；原件常带游离的 `has_style=True`、`value=None` 空格（如整列刷格式残留），
+        # 会把百万行全走一遍（2026-302135-LX9619-BG8634 实测：单表 1,048,575 行 → 长时间无响应）。
+        # 与 crwu-audit 的 prepare_materials.py 同一口径。按 (行, 列) 排序以保持
+        # 与原 `iter_rows()` 一致的行优序 —— 差异清单顺序必须可复现。
+        for (row_i, col_i), cell in sorted(getattr(ws, "_cells", {}).items()):
+            if not (isinstance(row_i, int) and isinstance(col_i, int)):
+                continue
+            if row_i in hidden_rows or get_column_letter(col_i) in hidden_cols:
+                continue
+            formula = cell.value
+            if not isinstance(formula, str) or not formula.startswith("="):
+                continue
+            formula_cells += 1
+            cached = wbv[ws.title].cell(row_i, col_i).value
+            try:
+                recalculated = ev.eval(formula)
+            except Unavailable as exc:
+                entry = {"sheet": ws.title, "cell": cell.coordinate, "formula": formula,
+                         "reason": str(exc)}
+                if isinstance(exc, EngineError):
+                    entry["engineError"] = True
+                    engine_errors += 1
+                not_recomputable.append(entry)
+                continue
+            except Exception as exc:                # 兜底：任何异常都不得中断整表
+                engine_errors += 1
+                not_recomputable.append(
+                    {"sheet": ws.title, "cell": cell.coordinate, "formula": formula,
+                     "engineError": True,
+                     "reason": f"引擎异常 {type(exc).__name__}: {exc}"})
+                continue
+            recomputed += 1
+            if cached is None or not _close(recalculated, cached):
+                mismatched += 1
+                differences.append({
+                    "sheet": ws.title, "cell": cell.coordinate, "formula": formula,
+                    "recalculated": recalculated, "cached": cached,
+                    "note": "重算值与缓存值不一致" if cached is not None else "有公式但无缓存值",
+                })
+            else:
+                matched += 1
 
     return {
         "file": workbook,
@@ -390,6 +436,9 @@ def run(workbook: str):
             "formulaCells": formula_cells, "recomputed": recomputed,
             "matched": matched, "mismatched": mismatched,
             "notRecomputable": len(not_recomputable),
+            # 引擎自身未能处理（类型不匹配等已归入普通未重算；此处只计非预期的引擎异常）。
+            # 非 0 表示可能有引擎缺陷，须排查 —— 不得当作"该表数据问题"。
+            "engineErrors": engine_errors,
         },
         "differences": differences,
         "notRecomputable": not_recomputable,

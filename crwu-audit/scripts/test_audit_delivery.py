@@ -371,10 +371,17 @@ class ExternalDataVerificationTest(unittest.TestCase):
         ]
         self.assertEqual(sorted(positions), positions, "外部数据核验区顺序必须符合 §3 交付结构")
 
-    def test_unconfigured_source_is_declared_in_html(self):
-        self.assertIn("本次未配置 / 未认证 万得，相关条目未经双源复核。", self.document)
-        self.assertIn("未配置", self.document)
-        self.assertIn("未授权", self.document)
+    def test_unavailable_source_is_declared_in_html(self):
+        result = load_sample()
+        verification = result["externalDataVerification"]
+        verification["sources"][0]["configured"] = False
+        verification["sources"][0]["authenticated"] = False
+        verification["sources"][0]["note"] = "两条取数路径都不可用；相关条目未经外部数据核验"
+        verification["unavailableDeclaration"] = "本次未配置 / 未认证 同花顺 iFinD，相关条目未经外部数据核验。"
+        document = delivery.render(result)
+        self.assertIn(verification["unavailableDeclaration"], document)
+        self.assertIn("未配置", document)
+        self.assertIn("未授权", document)
 
     def test_each_check_shows_correct_and_incorrect_with_deviation(self):
         self.assertIn("EXTERNAL", self.document.replace("EXT-", "EXTERNAL"))  # 编号可见（示意）
@@ -450,16 +457,21 @@ class ExternalDataVerificationTest(unittest.TestCase):
 
     def test_unavailable_declaration_is_required_when_source_missing(self):
         result = load_sample()
-        result["externalDataVerification"].pop("unavailableDeclaration", None)
+        verification = result["externalDataVerification"]
+        verification["sources"][0]["configured"] = False
+        verification["sources"][0]["authenticated"] = False
+        verification.pop("unavailableDeclaration", None)
         errors = delivery.validate(result)
         self.assertIn("unavailableDeclaration", "\n".join(errors))
 
-    def test_unavailable_source_cannot_be_used_as_second_source(self):
+    def test_unavailable_source_cannot_be_used_as_verification_basis(self):
         result = load_sample()
-        check = result["externalDataVerification"]["checks"][0]
-        check["sources"][1].pop("available", None)
+        verification = result["externalDataVerification"]
+        verification["sources"][0]["configured"] = False
+        verification["sources"][0]["authenticated"] = False
+        verification["unavailableDeclaration"] = "本次未配置 / 未认证 同花顺 iFinD，相关条目未经外部数据核验。"
         errors = delivery.validate(result)
-        self.assertIn("未配置 / 未认证", "\n".join(errors))
+        self.assertIn("不可用", "\n".join(errors))
 
     def test_source_must_be_declared(self):
         result = load_sample()

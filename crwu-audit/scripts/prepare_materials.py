@@ -60,6 +60,15 @@ MAX_ENTRIES = 2000
 MAX_TOTAL_BYTES = 500 * 1024 * 1024
 MAX_NESTED_DEPTH = 2
 
+# ---- 表格遍历的四层边界（口径见 crwu-audit/references/00 §Excel 隐藏数据隔离） ----
+# B1 扫描边界 = 存在的格（精确集合，无阈值）；B2 内容边界 = 其中有值的格；
+# B3 异常阈值 = 声明用区与内容用区之差；B4 硬护栏 = 单表真实格数。
+# 关键：**"空洞大" ≠ "表大"**。实测坏表 944 格 / 空洞 104 万行；真有 5 万行的表空洞 0 行。
+# 故 B4 按规模裁、不按空洞裁；B3 只出提示、不改变遍历。
+ORPHAN_SPAN_ROWS = 1000          # B3：声明用区 − 内容用区 > 此值 → 记 sheetAnomalies（仅提示）
+ORPHAN_SPAN_COLS = 1000
+MAX_SHEET_CELLS = 2_000_000      # B4：单表"有值格"上限，超限记 capabilityGaps 并跳过该表
+
 
 def is_archive(name: str) -> bool:
     low = name.lower()
@@ -354,15 +363,130 @@ def _collapsed_outline_cols(ws) -> set:
     return out
 
 
-def _hidden_metadata(wb_value, wb_formula) -> dict:
-    """只读结构元数据以识别隐藏区；隐藏 sheet 只记名字，不枚举其行列。"""
-    hidden = {"hiddenSheets": [], "hiddenRows": {}, "hiddenCols": {}}
+def _norm_sheet(name: str) -> str:
+    """工作表名归一：去首尾空白 + 全角空格 + 统一大小写。
+
+    用于隐藏结构 key 与 openpyxl `ws.title` 的比较——**两侧都必须归一**。
+    历史失效：只对一侧 strip()，凡表名含首尾空格（如 `2-1市场法询价记录  `）即恒返回 0 处引用（漏报）。
+    不做 casefold：公式里的表名是**大小写敏感字面量**，折大小写会把 `'Sheet1'!A1` 与 `Sheet1` 混同，
+    从而漏判“引用隐藏工作表”。
+    """
+    if not isinstance(name, str):
+        return ""
+    return name.replace("\u3000", " ").strip()
+
+
+def _xml_attrs(tag_body: str) -> dict:
+    """把标签体解析为属性字典。
+
+    **不能假设属性顺序**：openpyxl 写 `Target=/xl/… Id=rId1`，而 Excel 常见 `Id=… Target=…`。
+    早期实现用单条 `Id="…" Target="…"` 正则，遇到倒序即静默取空 → 隐藏行/列恒为空集
+    （真实失效：workbook.xml.rels 中 Target 在 Id 之前，导致修复前 `_raw_xml_hidden` 永远返回空集合）。
+    """
+    import re
+    return {m.group(1): m.group(2)
+            for m in re.finditer(r'([A-Za-z_:][\w:.-]*)\s*=\s*"([^"]*)"', tag_body)}
+
+
+def _raw_xml_hidden(p: str):
+    """从 xlsx 包内 XML 直读隐藏结构（**区段展开**），返回 {sheetName: {"state":…, "cols":set,"rows":set}}。
+
+    为什么必须读原始 XML：openpyxl 把 `<col min="10" max="11" hidden="1"/>` 这样的**区段**只挂在首列
+    （J）上，`ws.column_dimensions` 因此看不到 K —— 只按它取隐藏集合会**漏剔区段内的其余列**，
+    把人工隐藏的内容当成可见内容读进工作版，进而产出假阳性意见（2026-302150-LX9757-BG8677 实测：
+    03/04 两簿共 10 个真实隐藏列被误当可见）。行同理（`<row r="…" hidden="1"/>`）。
+    """
+    import re
+    import zipfile
+
+    out = {}
+    try:
+        z = zipfile.ZipFile(p)
+    except Exception:
+        return out
+    with z:
+        try:
+            wb = z.read("xl/workbook.xml").decode("utf-8", "replace")
+        except KeyError:
+            return out
+        rels = ""
+        try:
+            rels = z.read("xl/_rels/workbook.xml.rels").decode("utf-8", "replace")
+        except KeyError:
+            pass
+        targets = {}
+        for rel in re.finditer(r"<Relationship\b([^>]*)/?>", rels):
+            a = _xml_attrs(rel.group(1))
+            rid, tgt = a.get("Id"), a.get("Target")
+            if rid and tgt:
+                targets[rid] = tgt
+        for m in re.finditer(r"<sheet\b([^>]*)/?>", wb):
+            a = _xml_attrs(m.group(1))
+            name = a.get("name")
+            if not name:
+                continue
+            state = a.get("state") or "visible"
+            target = targets.get(a.get("r:id") or "", "")
+            cols, rows = set(), set()
+            if target:
+                # Target 三种写法都要认：`/xl/worksheets/sheet1.xml`（绝对，openpyxl 即此）
+                # / `worksheets/sheet1.xml`（相对 rels 所在的 xl/） / `xl/…`（已带前缀）。
+                # 早期实现直接 `"xl/" + target.lstrip("/")` 把绝对路径拼成 `xl/xl/…`，
+                # KeyError 被 except 吞掉 → 隐藏行/列**恒为空集**（本次修复的真正根因）。
+                t = target.replace("\\", "/").lstrip("/")
+                for cand in (t, "xl/" + t):
+                    try:
+                        xml = z.read(cand).decode("utf-8", "replace")
+                        break
+                    except KeyError:
+                        continue
+                else:
+                    xml = ""
+                for c in re.finditer(r"<col\b([^>]*)/?>", xml):
+                    ca = _xml_attrs(c.group(1))
+                    if str(ca.get("hidden", "")).lower() not in ("1", "true"):
+                        continue
+                    if "min" not in ca:
+                        continue
+                    lo = int(ca["min"])
+                    hi = int(ca["max"]) if ca.get("max") else lo
+                    for i in range(lo, hi + 1):          # 区段展开：这是本函数存在的理由
+                        cols.add(i)
+                for r_ in re.finditer(r"<row\b([^>]*)/?>", xml):
+                    ra = _xml_attrs(r_.group(1))
+                    if str(ra.get("hidden", "")).lower() not in ("1", "true"):
+                        continue
+                    if ra.get("r"):
+                        rows.add(int(ra["r"]))
+            out[name] = {"state": state, "cols": cols, "rows": rows}
+    return out
+
+
+def _hidden_metadata(wb_value, wb_formula, path: str | None = None) -> dict:
+    """只读结构元数据以识别隐藏区；隐藏 sheet 只记名字，不枚举其行列。
+
+    `cols/rows` 优先取 raw XML 的**展开后**真实集合（`path` 给出时）；raw XML 不可得才退回
+    openpyxl（此时区段内其余列会漏，属降级，会在 note 中体现为 hiddenMetaSource）。
+    """
+    from openpyxl.utils import get_column_letter
+
+    raw = _raw_xml_hidden(path) if path else {}
+    hidden = {"hiddenSheets": [], "hiddenRows": {}, "hiddenCols": {},
+              "hiddenMetaSource": "raw-xml" if raw else "openpyxl"}
     for ws in wb_value.worksheets:
+        rinfo = raw.get(ws.title)
+        if rinfo and rinfo["state"] != "visible":
+            hidden["hiddenSheets"].append(ws.title)
+            continue
         if ws.sheet_state != "visible":
             hidden["hiddenSheets"].append(ws.title)
             continue
-        rows = {r for r, d in ws.row_dimensions.items() if d.hidden} | _collapsed_outline_rows(ws)
-        cols = {c for c, d in ws.column_dimensions.items() if d.hidden} | _collapsed_outline_cols(ws)
+        if rinfo:
+            rows = set(rinfo["rows"]) | _collapsed_outline_rows(ws)
+            cols = {get_column_letter(i) for i in rinfo["cols"]} | _collapsed_outline_cols(ws)
+        else:
+            rows = {r for r, d in ws.row_dimensions.items() if d.hidden} | _collapsed_outline_rows(ws)
+            cols = {c for c, d in ws.column_dimensions.items() if d.hidden} | _collapsed_outline_cols(ws)
         if rows:
             hidden["hiddenRows"][ws.title] = sorted(rows)
         if cols:
@@ -399,102 +523,230 @@ def audit_hidden_references(wbf, hidden: dict):
 
     只读可见格的公式串；隐藏行/列/隐藏 sheet 的单元格**一律不读**（H0）。
     用途：判定"可见结果是否依赖不可见的计算输入" → 计算链不可复核。
+
+    表名归一：工作表名常带首尾空格（如 `2-1市场法询价记录  `），此前用 strip() 后的名字与未 strip 的
+    `ws.title` 比较，**凡表名含首尾空格即恒返回 0 处引用**（漏报）。此处双方统一 `_norm_sheet()` 归一，
+    并在"隐藏结构里出现了但没有任何可见表与之匹配"时抛错，**不得静默返回 0**。
     """
-    from openpyxl.utils import column_index_from_string, get_column_letter
-    hidden_sheets = set(hidden.get("hiddenSheets", []))
-    hid_rows = {s: set(v) for s, v in hidden.get("hiddenRows", {}).items()}
+    from openpyxl.utils import column_index_from_string
+    hidden_sheets = {_norm_sheet(s) for s in hidden.get("hiddenSheets", [])}
+    hid_rows = {_norm_sheet(s): set(v) for s, v in hidden.get("hiddenRows", {}).items()}
     # 忽略清单里列用字母（给人看），比对时必须换算成列序号
-    hid_cols = {s: {column_index_from_string(c) for c in v}
+    hid_cols = {_norm_sheet(s): {column_index_from_string(c) for c in v}
                 for s, v in hidden.get("hiddenCols", {}).items()}
+    visible = [ws for ws in wbf.worksheets if ws.sheet_state == "visible"]
+    visible_norm = {_norm_sheet(ws.title) for ws in visible}
+    declared = set(hid_rows) | set(hid_cols)
+    unmatched = sorted(declared - visible_norm)
+    if unmatched:
+        raise RuntimeError(
+            "隐藏区引用审计无法完成：隐藏结构中的工作表 {0} 与任何可见工作表名不匹配"
+            "（表名归一后仍不一致）→ 不得视为'0 处引用'".format(unmatched))
     hits, seen = [], set()
-    for ws in wbf.worksheets:
-        if ws.sheet_state != "visible":
-            continue                      # H0：隐藏 sheet 整体不读
-        rows_h = hid_rows.get(ws.title, set())
-        cols_h = hid_cols.get(ws.title, set())          # 列序号集合
-        for row in ws.iter_rows():
-            for c in row:
-                if c.row in rows_h or c.column in cols_h:
-                    continue              # H0：隐藏格不读
-                f = c.value
-                if not isinstance(f, str) or not f.startswith("="):
-                    continue
-                for m in _REF_RE.finditer(f):
-                    sheet = (m.group("q") or m.group("s") or ws.title).strip()
-                    kind = None
-                    if sheet in hidden_sheets:
-                        kind = "引用隐藏工作表"
-                    elif sheet == ws.title:
-                        rows, cols = _span(m.group("a"), m.group("b"))
-                        if rows & rows_h:
-                            kind = "引用隐藏行"
-                        elif cols & cols_h:
-                            kind = "引用隐藏列"
-                    if kind:
-                        key = (ws.title, c.coordinate, m.group(0))
-                        if key in seen:
-                            continue
-                        seen.add(key)
-                        hits.append({"sheet": ws.title, "cell": c.coordinate,
-                                     "kind": kind, "ref": m.group(0)})
+    for ws in visible:
+        key_title = _norm_sheet(ws.title)
+        rows_h = hid_rows.get(key_title, set())
+        cols_h = hid_cols.get(key_title, set())          # 列序号集合
+        # B1 扫描边界：只遍历**实际存在**的格（精确集合），不用 `ws.iter_rows()`——
+        # 后者按 dimension 扫满矩形，遇游离格式格会把 1M 行全走一遍
+        # （2026-302135-LX9619-BG8634 实测该表单此一处 69.9 s；改后 0.12 s）。
+        for (r_, c_), cell in _cells_of(ws).items():
+            if r_ in rows_h or c_ in cols_h:
+                continue              # H0：隐藏格不读
+            f = cell.value
+            if not isinstance(f, str) or not f.startswith("="):
+                continue
+            for m in _REF_RE.finditer(f):
+                sheet = _norm_sheet(m.group("q") or m.group("s") or ws.title)
+                kind = None
+                if sheet in hidden_sheets:
+                    kind = "引用隐藏工作表"
+                elif sheet == key_title:
+                    rows, cols = _span(m.group("a"), m.group("b"))
+                    if rows & rows_h:
+                        kind = "引用隐藏行"
+                    elif cols & cols_h:
+                        kind = "引用隐藏列"
+                if kind:
+                    key = (ws.title, cell.coordinate, m.group(0))
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    hits.append({"sheet": ws.title, "cell": cell.coordinate,
+                                 "kind": kind, "ref": m.group(0)})
     return hits
+
+
+def _cells_of(ws) -> dict:
+    """该表**实际存在**的格：`{(row, col): Cell}`。
+
+    注意"存在"≠"有值"：原件常见游离的 `has_style=True`、`value=None` 空格
+    （整列/整行刷格式的残留）。二者必须分开用——见 `_sheet_bounds` 与 `_content_coords`。
+    """
+    cells = getattr(ws, "_cells", None)
+    if not isinstance(cells, dict):
+        return {}
+    return {k: c for k, c in cells.items() if isinstance(k, tuple) and len(k) == 2}
+
+
+def _content_coords(ws, wsf=None) -> set:
+    """**有值**格的坐标集合：缓存值非 `None`（`ws`）∪ 公式串非空（`wsf`）。样式不算。
+
+    与重建循环的取舍口径一致（`if v is None and f is None: continue`）：
+    纯格式格本来就不进工作版，因此它们既不该参与边界判定、也不该被遍历。
+    """
+    out = set()
+    for w in (ws, wsf):
+        if w is None:
+            continue
+        for key, cell in _cells_of(w).items():
+            if getattr(cell, "value", None) is not None:
+                out.add(key)
+    return out
+
+
+def _declared_span(ws) -> tuple:
+    """原件**声明**的用区上界 `(maxRow, maxCol)`，取其 dimension 字面，不重建边界。"""
+    try:
+        dim = ws.calculate_dimension()
+    except Exception:
+        return 0, 0
+    m = re.match(r"^\$?([A-Z]{1,3})\$?(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?$", (dim or "").strip())
+    if not m:
+        return 0, 0
+    from openpyxl.utils import column_index_from_string
+    return int(m.group(4) or m.group(2)), column_index_from_string(m.group(3) or m.group(1))
+
+
+def _sheet_anomaly(ws, content_rows: int, content_cols: int, style_only: int):
+    """B3：声明用区与实际有值区相差上千行/列 → 该表不规范，登记（**不改变遍历**）。
+
+    这类表会让**任何**按 dimension 遍历的下游工具一起变慢，属可见区表格规范缺陷，
+    与 `hiddenStructureDrift` 同为一类提示。
+    """
+    declared_rows, declared_cols = _declared_span(ws)
+    orphan_rows = max(0, declared_rows - content_rows)
+    orphan_cols = max(0, declared_cols - content_cols)
+    if orphan_rows <= ORPHAN_SPAN_ROWS and orphan_cols <= ORPHAN_SPAN_COLS:
+        return None
+    return {"sheet": ws.title,
+            "declaredDim": ws.calculate_dimension(),
+            "contentRows": content_rows, "contentCols": content_cols,
+            "orphanRows": orphan_rows, "orphanCols": orphan_cols,
+            "styleOnlyCells": style_only,
+            "note": "声明用区远大于实际有值区（疑整行/整列刷格式残留）；"
+                    "本次按有值区处理，不影响审核范围"}
+
+
+def _sheet_bounds(ws, wsf=None) -> tuple:
+    """真实**用区**上界 (maxRow, maxCol)：只按**有值**的格算，用于遍历边界。
+
+    三段历史，缺一不可：
+
+    1. 不能直接用 `ws.max_row/max_column`：原件常带被虚增的 dimension（如 `A1:Y1048575`），
+       按它遍历会退化成百万行循环。
+    2. 也不能只按 `_cells` 的**存在格**算：第 1048575 行常有一个 `has_style=True`、
+       `value=None` 的游离格式格，它同样把边界顶到 104 万行
+       （2026-302135-LX9619-BG8634 实测：944 个存在格中 697 个纯格式 + 1 个游离在末行
+       → 2614 万次循环 → 单表 56 s）。
+    3. 故按**有值格**定界；声明用区与实际用区的差距交由 `_sheet_anomaly()` 单独登记，
+       不丢信息。
+    """
+    coords = _content_coords(ws, wsf)
+    if coords:
+        return max(r for r, _ in coords), max(c for _, c in coords)
+    dim = ws.calculate_dimension(force=True)
+    m = re.match(r"^[A-Z]+(\d+)(?::[A-Z]+(\d+))?$", dim or "")
+    if m:
+        from openpyxl.utils import column_index_from_string
+        parts = (dim.split(":") + [dim])[:2]
+        cols = [column_index_from_string(re.match(r"^([A-Z]+)", x).group(1)) for x in parts]
+        rows_ = [int(re.search(r"(\d+)$", x).group(1)) for x in parts]
+        return max(rows_), max(cols)
+    return ws.max_row, ws.max_column
 
 
 def xlsx_visible(p: str, outdir: str, out_name: str):
     """重建法：新建簿，只复制「可见 sheet × 可见行 × 可见列」的值（缓存值优先）与格式。
 
     禁止用 delete_rows/delete_cols 逐行列删除（会残留维度元数据）。
+    隐藏集合取 **raw XML 展开后的真实区段**（`_hidden_metadata(..., path=p)`），
+    遍历边界取真实用区（`_sheet_bounds`），避免"隐藏区漏剔"与"虚增 dimension 长循环"两类失效。
+    返回 `(out, hidden, stats, resid, unavailable, refs, anomalies, gaps)`。
     """
     import openpyxl
     from openpyxl.utils import get_column_letter
 
     src = openpyxl.load_workbook(p, data_only=True)      # 缓存值
     srcf = openpyxl.load_workbook(p, data_only=False)    # 公式串
-    hidden = _hidden_metadata(src, srcf)
+    hidden = _hidden_metadata(src, srcf, path=p)
 
     dst = openpyxl.Workbook()
     dst.remove(dst.active)
-    stats, unavailable = [], []
+    stats, unavailable, anomalies, gaps = [], [], [], []
     for ws in src.worksheets:
         if ws.sheet_state != "visible":
             continue  # H0：隐藏 sheet 整体跳过，不读其任何单元格
         wsf = srcf[ws.title]
         hidden_rows = set(hidden["hiddenRows"].get(ws.title, []))
         hidden_cols = set(hidden["hiddenCols"].get(ws.title, []))
+        # B4 硬护栏：按**规模**（有值格数）裁，不按空洞裁。超限记 gap 并跳过该表，其余表继续。
+        coords = _content_coords(ws, wsf)
+        if len(coords) > MAX_SHEET_CELLS:
+            gaps.append({"sheet": ws.title,
+                         "reason": f"有值格 {len(coords)} 超上限 {MAX_SHEET_CELLS}，该表本次未完整处理"})
+            continue
         o = dst.create_sheet(ws.title[:31])
-        vis_rows = [r for r in range(1, ws.max_row + 1) if r not in hidden_rows]
+        max_row, max_col = _sheet_bounds(ws, wsf)
+        # B1 扫描边界：只遍历**有值**的格（精确集合），不按矩形扫。
+        # 按 dimension（或按"存在的格"）扫矩形，会在游离格式格上退化成百万行循环
+        # （2026-302135-LX9619-BG8634 实测 26,214,375 次 → 单表 56 s；改后 0.00 s）。
+        # 行号语义不变：`vis_rows` 仍是「1..有值末行 减去隐藏行」。
+        vis_rows = [r for r in range(1, max_row + 1) if r not in hidden_rows]
+        row_out = {r: i for i, r in enumerate(vis_rows, 1)}
         used = no_cached = 0
-        for ri, r in enumerate(vis_rows, 1):
-            for c in range(1, ws.max_column + 1):
-                if get_column_letter(c) in hidden_cols:
-                    continue  # H0：隐藏列不读
-                v = ws.cell(r, c).value
-                f = wsf.cell(r, c).value
-                if v is None and f is None:
-                    continue
-                cell = o.cell(ri, c)
-                if v is not None:
-                    cell.value = v                      # 缓存值优先
-                    if f is not None:
-                        cell.number_format = wsf.cell(r, c).number_format
-                elif isinstance(f, str) and f.startswith("="):
-                    cell.value = f                      # 仅当无缓存值时保留公式串
+        for r, c in sorted(coords):
+            ri = row_out.get(r)
+            if ri is None or get_column_letter(c) in hidden_cols:
+                continue  # H0：隐藏行 / 隐藏列不读
+            v = ws.cell(r, c).value
+            f = wsf.cell(r, c).value
+            if v is None and f is None:
+                continue  # 双簿口径兜底（有值格集合已保证至少一簿非 None）
+            cell = o.cell(ri, c)
+            if v is not None:
+                cell.value = v                      # 缓存值优先
+                if f is not None:
                     cell.number_format = wsf.cell(r, c).number_format
-                    no_cached += 1
-                used += 1
+            elif isinstance(f, str) and f.startswith("="):
+                cell.value = f                      # 仅当无缓存值时保留公式串
+                cell.number_format = wsf.cell(r, c).number_format
+                no_cached += 1
+            used += 1
         if no_cached:
             unavailable.append({"sheet": ws.title, "cells": no_cached})
-        stats.append({"sheet": ws.title, "visibleRows": len(vis_rows), "cells": used,
-                      "maxRow": ws.max_row, "maxCol": ws.max_column,
-                      "valueUnavailable": no_cached})
+        entry = {"sheet": ws.title, "visibleRows": len(vis_rows), "cells": used,
+                 "maxRow": max_row, "maxCol": max_col,
+                 "valueUnavailable": no_cached}
+        # D3 不许丢信息：有值区与声明用区不一致时，把声明用区一并记账。
+        # 未超 B3 阈值（<1000 行/列）的表不会进 sheetAnomalies，此处是其唯一留痕处。
+        declared = _declared_span(ws)
+        if declared != (max_row, max_col):
+            entry["declaredSpan"] = {"maxRow": declared[0], "maxCol": declared[1]}
+        stats.append(entry)
+        # B3 异常登记（仅提示，不改变遍历）：声明用区远大于实际有值区 → 表格规范缺陷
+        anomaly = _sheet_anomaly(ws, max_row, max_col, len(_cells_of(ws)) - len(coords))
+        if anomaly:
+            anomalies.append(anomaly)
     os.makedirs(outdir, exist_ok=True)
     out = os.path.join(outdir, out_name)
     dst.save(out)
 
+    # 契约要求（refs/00 §Excel）：保存后重新打开工作版，验证隐藏区数量为 0。
     chk = openpyxl.load_workbook(out)
     resid = sum(1 for ws in chk.worksheets if ws.sheet_state != "visible")
     refs = audit_hidden_references(srcf, hidden)
-    return out, hidden, stats, resid, unavailable, refs
+    return out, hidden, stats, resid, unavailable, refs, anomalies, gaps
 
 
 def prepare(case: str, src_dir: str, txt_dir: str, work_dir: str,
@@ -509,6 +761,7 @@ def prepare(case: str, src_dir: str, txt_dir: str, work_dir: str,
     extract_dir = os.path.abspath(extract_dir or os.path.join(case, "解压"))
     inv, seen_xlsx, archives = [], set(), []
     hidden_by_stem = {}   # 同名（跨版本）文件的隐藏结构，用于元数据级跨版本比对
+    sheet_anomalies = []  # B3：声明用区远大于实际有值区的表（表格规范提示，非审核范围变更）
     queue = []
     for root, _, fs in os.walk(src_dir):
         for f in sorted(fs):
@@ -585,7 +838,8 @@ def prepare(case: str, src_dir: str, txt_dir: str, work_dir: str,
                     out_name = f"{stem}__{os.path.basename(os.path.dirname(p))}{se}"
                     rec["nameCollision"] = True
                 seen_xlsx.add(out_name)
-                out, hidden, stats, resid, unavailable, refs = xlsx_visible(p, work_dir, out_name)
+                out, hidden, stats, resid, unavailable, refs, anomalies, wb_gaps = \
+                    xlsx_visible(p, work_dir, out_name)
                 rec["readable"] = True
                 rec["workbook"] = {"workVersion": os.path.relpath(out, case),
                                    "sheets": stats, "hiddenResidual": resid,
@@ -593,8 +847,15 @@ def prepare(case: str, src_dir: str, txt_dir: str, work_dir: str,
                                    "valueUnavailable": unavailable,
                                    "hiddenRefs": refs[:50],
                                    "hiddenRefsCount": len(refs),
+                                   "sheetAnomalies": anomalies,
+                                   "capabilityGaps": wb_gaps,
                                    "calcChainNotReproducible": sorted(
                                        {f"{h['sheet']}!{h['cell']}" for h in refs})}
+                for a in anomalies:                       # B3：表格规范提示，逐表登记
+                    sheet_anomalies.append({"path": rel, "stage": rec["stage"], **a})
+                for g in wb_gaps:                         # B4：超限未处理，如实记账
+                    rec.setdefault("capabilityGaps", []).append(
+                        f"{g['sheet']}：{g['reason']}")
                 # 跨版本隐藏结构比对（只比对元数据，不读隐藏内容）
                 stem = os.path.basename(p).split(".")[0]
                 hidden_by_stem.setdefault(stem, []).append(
@@ -654,13 +915,14 @@ def prepare(case: str, src_dir: str, txt_dir: str, work_dir: str,
                      for v in metas.values()),
                     key=lambda d: sorted(d["stages"]))
             })
-    payload = {"items": inv, "archives": archives, "hiddenStructureDrift": drift}
+    payload = {"items": inv, "archives": archives, "hiddenStructureDrift": drift,
+               "sheetAnomalies": sheet_anomalies}
     inv_path = os.path.join(case, "材料盘点.json")
     with open(inv_path, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, ensure_ascii=False, indent=1)
     return {"inventory": inv_path, "items": len(inv),
             "readable": sum(1 for r in inv if r.get("readable")),
-            "archives": archives}
+            "archives": archives, "sheetAnomalies": sheet_anomalies}
 
 
 def main() -> int:
@@ -686,6 +948,16 @@ def main() -> int:
               f"{os.path.relpath(a['destDir'], os.path.abspath(args.case))}"
               + (f"（隔离跳过 {len(a['skippedIsolation'])}）" if a["skippedIsolation"] else "")
               + (f"（{'; '.join(a['capabilityGaps'])}）" if a["capabilityGaps"] else ""))
+    anomalies = result.get("sheetAnomalies", [])
+    if anomalies:
+        print(f"\n表格规范提示 {len(anomalies)} 处（声明用区远大于实际有值区，本次按有值区处理，"
+              f"不影响审核范围；明细见 材料盘点.json 的 sheetAnomalies）：")
+        for a in anomalies[:10]:
+            print(f"  {a['path']} [{a['sheet']}] 声明 {a['declaredDim']}，"
+                  f"实际有值 {a['contentRows']}行×{a['contentCols']}列，"
+                  f"多出 {a['orphanRows']}行/{a['orphanCols']}列，纯格式格 {a['styleOnlyCells']}")
+        if len(anomalies) > 10:
+            print(f"  ……另有 {len(anomalies) - 10} 处")
     missing = missing_deps()
     if missing:
         print(f"提示：缺少可选依赖 {', '.join(missing)}——对应格式可能读不到，"

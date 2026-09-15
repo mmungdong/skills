@@ -1,28 +1,37 @@
 #!/usr/bin/env python3
-"""外部数据源连接器只读探测（crwu-audit-external-data）。
+"""外部数据源只读探测：同花顺 iFinD 的两条取数路径（crwu-audit-external-data）。
 
-用途：WorkBuddy 等宿主把同花顺 iFinD / 万得做成内置连接器（MCP）。当当前会话没有暴露对应
-MCP 工具时，本脚本读宿主连接器声明，回答"数据源是否存在、是否启用、有没有可核实的授权证据"。
+背景：本技能的唯一外部数据源是同花顺 iFinD，但不同宿主的取数路径不同——
+
+- **WorkBuddy**：宿主把同花顺 iFinD 做成内置连接器（MCP，连接器 id `ifind-mcp`，服务端授权）；
+  会话可能直接暴露对应 MCP 工具；未暴露时读宿主连接器声明。
+- **DeepSeek Harness**：没有 WorkBuddy 连接器，同花顺 iFinD 以**技能** `ifind-finance-data` 提供
+  （该技能自带 `call.py` / `call-node.js`，直连同花顺 MCP HTTP 服务，凭据在技能自身的
+  `mcp_config.json`）；用该技能取数，不读宿主连接器目录。
+
+本脚本在会话未直接暴露取数入口时，读这两类**声明**，回答"同花顺 iFinD 是否存在、是否启用、
+有没有可核实的授权证据"。万得不在本技能范围内，不探测、不作为数据源。
 
 只读纪律：
-- 只读连接器声明的**键名与启用状态**；
-- 不读取、不输出任何令牌 / Authorization 值；URL 只输出主机名（去掉路径与查询串）；
+- 只读连接器声明的**键名与启用状态**、技能目录结构与文件是否存在；
+- 不读取、不输出任何令牌 / Authorization 值，也**不解析 `mcp_config.json` 的内容**；
+  URL 只输出主机名（去掉路径与查询串）；
 - 不发起任何网络请求。
 
 判定口径（重要）：
 - **只有宿主声明（`mcp.json` / `connectors/*/mcp.json`）才算"已声明"**；连接器市场目录
   （`connectors-marketplace/.../connectors.json`）列出全部可安装连接器，**不作为已声明依据**。
-- 授权状态无法从文件可靠判定（凭据可能存放在宿主自身的凭据库中）：本脚本只给
-  `authEvidence`（`stored_authorization` / `server_side` / `ever_connected` / `none`），
-  不武断断言"未认证"；真正的判据是**运行时调用是否返回授权错误**。
-- 若运行时调用失败，按知识库表 D 降级并在交付件中声明（见 references/01-connector-access.md §3）。
+- Harness 技能路径只按"技能目录存在 + 调用脚本 + 凭据文件存在"给预检结论，**不断言凭据有效**；
+  真正的判据是**运行时调用是否返回授权错误**。
+- 若运行时调用失败，按知识库表 D 降级并在交付件中声明（见 references/01-connector-access.md §4）。
 
-宿主侧外部工具说明：这些连接器由宿主提供，本仓库不提供、不随技能安装。
+宿主侧外部工具说明：WorkBuddy 连接器与 `ifind-finance-data` 技能均由宿主 / 第三方提供，
+本仓库不提供、不随本技能安装。
 
 用法：
-  python3 scripts/connector_probe.py [--root <dir>] [--format json|text]
+  python3 scripts/connector_probe.py [--root <dir>] [--skills-root <dir>]... [--format json|text]
 
-退出码：0 = 探测完成；2 = 宿主连接器根目录不存在（仍输出 JSON 说明）。
+退出码：0 = 至少一条取数路径预检可用；2 = 未发现可用取数路径（仍输出 JSON 说明）。
 """
 from __future__ import annotations
 
@@ -33,17 +42,29 @@ import re
 import sys
 from pathlib import Path
 
-SCHEMA = "crwu.external-data.connector-probe.v1"
+SCHEMA = "crwu.external-data.connector-probe.v2"
 DEFAULT_ROOT_ENV = "CRWU_CONNECTOR_ROOT"
 DEFAULT_ROOT = "~/.workbuddy"
+SKILLS_ROOT_ENV = "CRWU_SKILLS_ROOT"
+HARNESS_SKILL_ID = "ifind-finance-data"
+# Harness 技能安装位置：显式环境变量 → 本技能所在 skills 根的同级 → 常见 skills 根。
+DEFAULT_SKILLS_ROOTS = ("~/.agents/skills", "~/.dsh/skills", "~/.codebuddy/skills", "~/.claude/skills")
 
-# 目标数据源 -> (id 关键词, 名称关键词)；id 命中权重高于名称。
-TARGETS = {
-    "ifind": (("ifind",), ("ifind", "同花顺")),
-    "wind": (("wind",), ("wind", "万得")),
-}
-TARGET_LABEL = {"ifind": "同花顺 iFinD", "wind": "万得"}
+IFIND_LABEL = "同花顺 iFinD"
+# 只在宿主已声明的连接器里匹配；id 命中权重高于名称。
+IFIND_ID_KEYS = ("ifind",)
+IFIND_NAME_KEYS = ("ifind", "同花顺")
 TOKEN_AUTH_MODES = ("token", "oauth", "apikey")
+
+# 状态优劣排序：available 最优，用于在两条路径间取"更可用"的一条。
+_STATE_RANK = {
+    "available": 5,
+    "likely_unauthenticated": 4,
+    "declared_disabled": 3,
+    "incomplete": 2,
+    "not_declared": 1,
+    "not_found": 0,
+}
 
 _SECRET_KEY = re.compile(r"(?i)(authorization|token|secret|password|cookie|api[_-]?key)")
 # 宿主 mcp.json 用带命名空间前缀的 id（connector:ifind-mcp），状态文件用裸 id（ifind-mcp）——
@@ -260,21 +281,21 @@ def scoped_disabled(entry, active_scope: str):
     return scopes.get("")
 
 
-def classify(entry, active_scope: str = ""):
-    """由声明事实推数据源状态；不断言凭据有效性（见模块 docstring 判定口径）。"""
+def classify_connector(entry, active_scope: str = ""):
+    """由宿主声明事实推连接器状态；不断言凭据有效性（见模块 docstring 判定口径）。"""
     if entry is None:
-        return {"state": "not_declared", "reason": "宿主未声明该数据源连接器"}
+        return {"state": "not_declared", "reason": "宿主未声明同花顺 iFinD 连接器"}
     if not entry.get("hostDeclared"):
         return {
             "state": "not_declared",
-            "reason": "仅出现在连接器市场目录中，宿主未声明该连接器",
+            "reason": "同花顺 iFinD 仅出现在连接器市场目录中，宿主未声明该连接器",
         }
     if (
         entry.get("userDisabled") is True
         or entry.get("enabled") is False
         or scoped_disabled(entry, active_scope) is True
     ):
-        return {"state": "declared_disabled", "reason": "宿主已声明该连接器但未启用"}
+        return {"state": "declared_disabled", "reason": "宿主已声明同花顺 iFinD 连接器但未启用"}
     evidence = entry.get("authEvidence")
     if (entry.get("authMode") or "").lower() in TOKEN_AUTH_MODES and evidence == "none":
         return {
@@ -287,99 +308,191 @@ def classify(entry, active_scope: str = ""):
     }
 
 
-def probe(root: Path) -> dict:
-    if not root.is_dir():
+def resolve_skills_roots(explicit) -> list:
+    """解析要扫描的 skills 根：显式参数优先；否则环境变量 → 本技能所在 skills 根 → 常见位置。"""
+    if explicit:
+        candidates = [str(item) for item in explicit]
+    else:
+        candidates = []
+        env = os.environ.get(SKILLS_ROOT_ENV)
+        if env:
+            candidates.append(env)
+        # 本技能被安装到某个 skills 根时，同花顺 iFinD 技能通常是它的同级副本。
+        candidates.append(str(Path(__file__).resolve().parents[2]))
+        candidates.extend(DEFAULT_SKILLS_ROOTS)
+    roots: list[Path] = []
+    for item in candidates:
+        path = Path(os.path.expanduser(str(item)))
+        if path not in roots:
+            roots.append(path)
+    return roots
+
+
+def find_harness_skill(skills_roots) -> dict | None:
+    """在 skills 根下查找同花顺 iFinD 技能；只读目录结构与文件是否存在。"""
+    for root in skills_roots:
+        skill_dir = root / HARNESS_SKILL_ID
+        if not skill_dir.is_dir():
+            continue
+        config = skill_dir / "mcp_config.json"
         return {
-            "schema": SCHEMA,
-            "root": str(root),
-            "rootExists": False,
-            "declarations": [],
-            "connectors": [],
-            "targets": {
-                name: {
-                    "label": TARGET_LABEL[name],
-                    "state": "not_declared",
-                    "reason": "宿主连接器根目录不存在",
-                    "connectorId": None,
-                }
-                for name in TARGETS
-            },
-            "notes": ["宿主连接器根目录不存在：未配置任何外部数据源连接器"],
+            "skillId": HARNESS_SKILL_ID,
+            "skillRoot": str(root),
+            "path": str(skill_dir),
+            "hasSkillManifest": (skill_dir / "SKILL.md").is_file(),
+            "callScripts": [name for name in ("call.py", "call-node.js") if (skill_dir / name).is_file()],
+            "configFile": config.name,
+            "configPresent": config.is_file() and config.stat().st_size > 0,
         }
-    connectors, declarations, active_scope = collect(root)
-    targets = {}
-    for name, (id_keys, name_keys) in TARGETS.items():
-        entry = match_target(connectors, id_keys, name_keys)
-        verdict = classify(entry, active_scope)
-        targets[name] = {
-            "label": TARGET_LABEL[name],
-            "state": verdict["state"],
-            "reason": verdict["reason"],
-            "connectorId": entry.get("connectorId") if entry else None,
-            "displayName": entry.get("displayName") if entry else None,
-            "hostDeclared": entry.get("hostDeclared") if entry else False,
-            "enabled": entry.get("enabled") if entry else None,
-            "userDisabled": entry.get("userDisabled") if entry else None,
-            "everConnected": entry.get("everConnected") if entry else None,
-            "authMode": entry.get("authMode") if entry else None,
-            "authEvidence": entry.get("authEvidence") if entry else None,
-            "endpointHost": entry.get("endpointHost") if entry else None,
-            "declaredIn": entry.get("declaredIn") if entry else [],
+    return None
+
+
+def classify_skill(info) -> dict:
+    """由技能目录事实推 Harness 取数路径状态；不解析 `mcp_config.json`，不断言密钥有效。"""
+    if info is None:
+        return {"state": "not_found", "reason": "未在已扫描的 skills 根发现 %s 技能" % HARNESS_SKILL_ID}
+    if not info.get("hasSkillManifest") or not info.get("callScripts"):
+        return {
+            "state": "incomplete",
+            "reason": "发现 %s 技能目录但缺少 SKILL.md 或调用脚本（call.py / call-node.js）" % HARNESS_SKILL_ID,
         }
+    if not info.get("configPresent"):
+        return {
+            "state": "likely_unauthenticated",
+            "reason": "发现 %s 技能但 %s 缺失或为空，需先写入 iFinD MCP 密钥" % (HARNESS_SKILL_ID, info.get("configFile")),
+        }
+    return {
+        "state": "available",
+        "reason": "发现 %s 技能且凭据文件存在（不校验密钥有效性，以运行时调用为准）" % HARNESS_SKILL_ID,
+    }
+
+
+def combine(connector_verdict: dict, skill_verdict: dict):
+    """合并两条取数路径：任一路径 available 即取数可用；否则取更接近可用的状态。"""
+    if connector_verdict["state"] == "available":
+        return "available", "host_connector", "WorkBuddy 宿主连接器可用：%s" % connector_verdict["reason"]
+    if skill_verdict["state"] == "available":
+        return (
+            "available",
+            "harness_skill",
+            "DeepSeek Harness 的 %s 技能可用：%s" % (HARNESS_SKILL_ID, skill_verdict["reason"]),
+        )
+    best = skill_verdict if _STATE_RANK[skill_verdict["state"]] > _STATE_RANK[connector_verdict["state"]] else connector_verdict
+    reason = "宿主连接器：%s；Harness 技能：%s" % (connector_verdict["reason"], skill_verdict["reason"])
+    return best["state"], "", reason
+
+
+def probe(root: Path, skills_roots=None) -> dict:
+    if skills_roots:
+        roots: list[Path] = []
+        for item in skills_roots:
+            path = Path(os.path.expanduser(str(item)))
+            if path not in roots:
+                roots.append(path)
+    else:
+        roots = resolve_skills_roots(None)
+    root_exists = root.is_dir()
+    if root_exists:
+        connectors, declarations, active_scope = collect(root)
+        entry = match_target(connectors, IFIND_ID_KEYS, IFIND_NAME_KEYS)
+        connector_verdict = classify_connector(entry, active_scope)
+    else:
+        connectors, declarations, active_scope = [], [], ""
+        entry = None
+        connector_verdict = {"state": "not_declared", "reason": "宿主连接器根目录不存在"}
+
+    skill_info = find_harness_skill(roots)
+    skill_verdict = classify_skill(skill_info)
+    state, access_path, reason = combine(connector_verdict, skill_verdict)
+
+    target = {
+        "label": IFIND_LABEL,
+        "state": state,
+        "reason": reason,
+        "accessPath": access_path,
+        "connectorId": entry.get("connectorId") if entry else None,
+        "displayName": entry.get("displayName") if entry else None,
+        "enabled": entry.get("enabled") if entry else None,
+        "userDisabled": entry.get("userDisabled") if entry else None,
+        "everConnected": entry.get("everConnected") if entry else None,
+        "authMode": entry.get("authMode") if entry else None,
+        "authEvidence": entry.get("authEvidence") if entry else None,
+        "endpointHost": entry.get("endpointHost") if entry else None,
+        "declaredIn": entry.get("declaredIn") if entry else [],
+        "connectorVerdict": connector_verdict,
+        "harnessSkill": skill_info,
+        "harnessSkillVerdict": skill_verdict,
+    }
+
+    notes = []
+    if not root_exists:
+        notes.append("宿主连接器根目录不存在：未从宿主侧发现同花顺 iFinD 连接器")
+    if skill_info is None:
+        notes.append("未在已扫描的 skills 根发现 %s 技能" % HARNESS_SKILL_ID)
     return {
         "schema": SCHEMA,
         "root": str(root),
-        "rootExists": True,
+        "rootExists": root_exists,
+        "skillsRoots": [str(item) for item in roots],
         "activeStateScope": active_scope,
         "declarations": declarations,
         "connectors": connectors,
-        "targets": targets,
-        "notes": [],
+        "targets": {"ifind": target},
+        "notes": notes,
     }
 
 
 def render_text(result: dict) -> str:
-    lines = ["外部数据源连接器探测（只读）", "根目录：" + redact_text(result["root"])]
-    if not result.get("rootExists"):
-        lines.append("根目录不存在：未配置任何外部数据源连接器")
-        return "\n".join(lines)
-    lines.append("声明文件：" + ("、".join(redact_text(d) for d in result["declarations"]) or "无"))
+    lines = ["外部数据源探测（只读）· 同花顺 iFinD", "宿主连接器根：" + redact_text(result["root"])]
+    lines.append("Harness 技能根：" + ("、".join(redact_text(item) for item in result.get("skillsRoots") or []) or "无"))
+    if result.get("rootExists"):
+        lines.append("声明文件：" + ("、".join(redact_text(d) for d in result["declarations"]) or "无"))
+    else:
+        lines.append("声明文件：无（宿主连接器根目录不存在）")
+    info = result["targets"]["ifind"]
     lines.append("")
-    lines.append("数据源           状态                     连接器          已启用  授权证据")
-    for name, info in result["targets"].items():
+    lines.append("状态：%s（取数路径：%s）" % (info.get("state") or "", info.get("accessPath") or "无可用路径"))
+    lines.append("说明：%s" % (info.get("reason") or ""))
+    skill = info.get("harnessSkill")
+    if skill:
         lines.append(
-            "{:<16}{:<25}{:<16}{:<8}{}".format(
-                info.get("label") or name,
-                info.get("state") or "",
-                info.get("connectorId") or "-",
-                "-" if info.get("enabled") is None else str(info.get("enabled")),
-                info.get("authEvidence") or "-",
+            "Harness 技能：%s（根 %s；调用脚本 %s；凭据文件 %s）"
+            % (
+                skill.get("skillId"),
+                skill.get("skillRoot"),
+                "、".join(skill.get("callScripts") or []) or "无",
+                "存在" if skill.get("configPresent") else "缺失",
             )
         )
-    lines.append("")
-    for name, info in result["targets"].items():
-        lines.append("· %s：%s" % (info.get("label") or name, info.get("reason")))
-    lines.append("说明：授权状态只作预检提示；最终以运行时调用结果为准，失败时按表 D 降级并在交付件中声明。")
+    for note in result.get("notes") or []:
+        lines.append("· " + note)
+    lines.append("提示：预检结论只作可用性提示；最终以运行时调用结果为准，失败时按表 D 降级并在交付件中声明。")
     return "\n".join(lines)
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="外部数据源连接器只读探测（不读取凭据值）")
+    parser = argparse.ArgumentParser(description="同花顺 iFinD 取数路径只读探测（不读取凭据值）")
     parser.add_argument(
         "--root",
         default=os.environ.get(DEFAULT_ROOT_ENV) or DEFAULT_ROOT,
         help="宿主连接器根目录（默认 $%s 或 %s）" % (DEFAULT_ROOT_ENV, DEFAULT_ROOT),
     )
+    parser.add_argument(
+        "--skills-root",
+        action="append",
+        default=None,
+        help="skills 根目录（可重复；默认 $%s、本技能所在 skills 根与常见位置）" % SKILLS_ROOT_ENV,
+    )
     parser.add_argument("--format", choices=("json", "text"), default="json")
     args = parser.parse_args(argv)
 
     root = Path(os.path.expanduser(args.root))
-    result = probe(root)
+    result = probe(root, args.skills_root)
     if args.format == "text":
         print(render_text(result))
     else:
         print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0 if result.get("rootExists") else 2
+    return 0 if result["targets"]["ifind"]["state"] == "available" else 2
 
 
 if __name__ == "__main__":

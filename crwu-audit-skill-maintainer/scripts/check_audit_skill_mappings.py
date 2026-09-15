@@ -658,6 +658,89 @@ def _suggested_skill(axis: str, label: str) -> str | None:
     return f"{prefix}-{suffix}"
 
 
+def inspect_method_layer_assembly(
+    repo_root: Path,
+    paths: set[str],
+    add_finding,
+) -> dict[str, object]:
+    """方法层 / 清单类内容必须有人装配（`ASSEMBLY_GAP_METHOD_LAYER`）。
+
+    背景（2026-09-15 实测）：方法轴技能 `crwu-audit-method-*` 为 pending 期间，方法层与清单类内容
+    由命中叶子的装配键承载。此前无此检查，`03-评估方法/**`、`06-规则库/清单-M-*`、`06-规则库/易错点库`
+    可长期无人装配而不报错，导致整套市场法审核清单（CHK-MKT-001~014）在真实审核中缺装。
+
+    判定只看**装配键集合**（不看正文）：被监视目录若存在于最新目录，但没有任何 audit 族技能在
+    `01-kb-assembly.md` / `00-KB装配表.md` 的路径键里覆盖它，即记装配缺口。
+    另检查通道可导性：覆盖了方法层目录时，下载规范必须声明原生文本通道（`drive +download` 或 `markdown fetch`）。
+    """
+    watched_prefixes = (
+        "03-评估方法/00-评估方法准则2019-精编/",
+        "03-评估方法/01-市场法/",
+        "03-评估方法/02-收益法/",
+        "03-评估方法/03-资产基础法/",
+        "03-评估方法/04-方法选择/",
+        "03-评估方法/05-审核要点/",
+        "06-规则库/清单-M-市场法/",
+        "06-规则库/清单-M-成本法/",
+        "06-规则库/易错点库/",
+    )
+    skills_root = repo_root / "skills"
+    top_levels = _catalog_top_levels(paths)
+    if not skills_root.is_dir() or not top_levels:
+        return {"watched": 0, "covered": 0, "gaps": [], "channelDeclared": False}
+
+    assembly_keys: dict[str, str] = {}
+    for skill_dir in sorted(skills_root.iterdir()):
+        if not skill_dir.is_dir() or not skill_dir.name.startswith(AUDIT_FAMILY_PREFIX):
+            continue
+        for name in ("01-kb-assembly.md", "00-KB装配表.md"):
+            for document in sorted(skill_dir.rglob(name)):
+                text = document.read_text(encoding="utf-8")
+                for key in _addressing_keys(text, top_levels):
+                    assembly_keys.setdefault(key, str(document.relative_to(repo_root)))
+
+    covered: list[dict[str, object]] = []
+    gaps: list[dict[str, object]] = []
+    watched = 0
+    for prefix in watched_prefixes:
+        if not any(path == prefix or path.startswith(prefix) for path in paths):
+            continue  # 目录不在最新目录 → 不是装配问题（由目录漂移类检查负责）
+        watched += 1
+        holders = sorted({source for key, source in assembly_keys.items()
+                          if key == prefix or key.startswith(prefix)})
+        if holders:
+            covered.append({"prefix": prefix, "coveredBy": holders})
+        else:
+            gaps.append({"prefix": prefix})
+            add_finding(
+                "ASSEMBLY_GAP_METHOD_LAYER",
+                "error",
+                (
+                    "method-layer/checklist content exists in the library but no leaf assembly key covers "
+                    "it; method-axis skills being pending does NOT mean the content may stay unassembled"
+                ),
+                path=prefix,
+            )
+
+    channel_declared = False
+    dws_root = skills_root / "crwu-dws"
+    if dws_root.is_dir():
+        for document in sorted(dws_root.rglob("*.md")):
+            lowered = document.read_text(encoding="utf-8").lower()
+            if ("drive" in lowered and "+download" in lowered) or ("markdown" in lowered and "fetch" in lowered):
+                channel_declared = True
+                break
+    if covered and not channel_declared:
+        add_finding(
+            "EXPORT_CHANNEL_UNDECLARED",
+            "error",
+            "native (non-adoc) nodes need an explicit download channel; the downloading spec declares none",
+            path="skills/crwu-dws",
+        )
+    return {"watched": watched, "covered": len(covered), "gaps": gaps,
+            "channelDeclared": channel_declared}
+
+
 def _catalog_age_hours(catalog: "Catalog") -> float | None:
     """Age of the catalog snapshot, or None when it carries no readable timestamp."""
     if not catalog.generated_at:
@@ -894,6 +977,8 @@ def inspect_repository(
                 (AXIS_SKILL_PREFIX["asset"], AXIS_SKILL_PREFIX["business"], LEGACY_BUSINESS_PREFIX)
             ):
                 skill_dirs[child.name] = child
+
+    method_layer = inspect_method_layer_assembly(repo_root, paths, add_finding)
 
     assembly_roots_by_skill: dict[str, set[str]] = {}
     frontmatter_names: dict[str, str] = {}
@@ -1349,6 +1434,7 @@ def inspect_repository(
         first_level, rows_by_key, skill_dirs, paths, findings, catalog
     )
     calibration["path_key_issues"] = path_key_issues
+    calibration["method_layer_assembly"] = method_layer
     return {
         "schema": REPORT_SCHEMA,
         "catalog": {

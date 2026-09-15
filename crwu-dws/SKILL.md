@@ -4,13 +4,14 @@ description: >-
   中瑞世联评估审核知识库（钉钉 wiki）【只读域】技能：M1 查询/导出该知识库（按精确库名解析
   组织+个人全范围，多命中全导）的完整层级目录，并缓存目录/索引到本地 ~/.crwu/knowledge
   的 dws-dir-cache 下；M2 按本次审核文件清单（crwu-audit 路由/子技能装配产出）**实时下载**
-  知识文档（adoc→markdown，逐文件 exportedAt）到与源审核数据文件同级的案例目录 knowledge/ 下
+  知识文档（**按节点 extension 双通道取数**：adoc→`doc +export` 导出 markdown；可读原生文本
+  md/txt→`drive +download` 原样取回；其余类型记 skipped 不伪造正文；逐文件 exportedAt）到与源审核数据文件同级的案例目录 knowledge/ 下
   ——清单同时支持单文件路径与目录路径，文件零缓存：每次审核重新下载，下载时刻即最新；
   M3 缓存兜底查找：按文件名/nodeId/库内层级路径 先查本地目录缓存，未命中自动刷新缓存后再查，
-  仍无则如实报告"没找到"；正文一律实时从钉钉导出（永不落缓存，保证最新）。
+  仍无则如实报告"没找到"；正文一律实时从钉钉取回（永不落缓存，保证最新）。
   缓存原则：目录可缓存、正文不缓存；缓存库名与 skill 目标库名不一致 → 先清理缓存、在线重下目录结构（防跨库误命中）。对钉钉零写操作。泛化钉钉知识库/doc 管理走
   dingtalk-wiki/dingtalk-doc；审核意见不属本技能。
-  命令前缀：dws wiki / dws doc。
+  命令前缀：dws wiki / dws doc / dws drive
 metadata:
   cli_version: ">=0.2.14"
   category: crwu
@@ -22,10 +23,10 @@ metadata:
 # crwu-dws（钉钉知识库只读域：M1 目录查询+缓存 / M2 按清单实时下载 / M3 路径·缓存兜底查找）
 
 ## 0. 目录结构与加载
-- `SKILL.md`（本文件，入口；三模式流程 + 缓存语义 + 只读白名单）
-- `references/00-目录快照schema.md` —— 快照 schema / 字段语义 / 渲染规则（M1/M2/M3 共用）
-- `references/01-审核下载与manifest规范.md` —— M2 按清单实时下载布局 / 文件与目录项语义 / manifest 与失败记账
-- `references/02-缓存与兜底查找规范.md` —— 缓存身份与名一致性清理 / 目录缓存布局 / node-index（含全路径键）/ M3 路径·查找与刷新协议 / 正文不落缓存红线
+- `SKILL.md`（本文件，入口；三模式流程 + 取数通道分流 + 缓存语义 + 只读白名单）
+- `references/00-目录快照schema.md` —— 快照 schema / 字段语义（含 `extension` 通道判据）/ 渲染规则（M1/M2/M3 共用）
+- `references/01-审核下载与manifest规范.md` —— M2 双通道下载布局 / 文件与目录项语义 / manifest、skipped 与失败记账
+- `references/02-缓存与兜底查找规范.md` —— 缓存身份与名一致性清理 / 目录缓存布局 / node-index（含全路径键与 `extension`）/ M3 路径·查找与刷新协议 / 正文不落缓存红线
 - 改前必读本技能 `references/00`–`references/02`（缓存语义与决策口径）；改动只落源仓并提交，运行时部署由用户 skills 管理机制负责（不直接写/ln/cp/rm `~/.skills-manager`、`~/.dsh`、`~/.workbuddy` 等运行时目录）
 
 ## 1. 触发与模式消歧
@@ -45,7 +46,14 @@ metadata:
 - 只通过 `dws` CLI；结构化读取用 `--format json`，按真实返回判断；已知命令直接执行，只有 leaf 参数/flag 不确定时读一次精确 Schema/Help；不加载产品级 Catalog。
 - 不猜命令、flag、字段、ID、名称；后续 ID 必须来自真实返回；解析/读取/导出全程同一 profile（多账号只用 `isOrgCurrent=true` 默认账号或用户明确指定）。
 - 不输出或记录 token 等凭据；认证/权限/profile/未知错误 → 只读 `dingtalk-shared` 对应 reference，不连续猜测；时间戳面向用户时转当前时区。
-- **对钉钉零写（硬白名单）**：wiki 域仅 `space-list/space-search/space-get/node-list/node-search/node-get`；doc 域仅 `+export`（远端只读、产物落本地）。禁止其余一切命令。
+- **对钉钉零写（硬白名单）**：wiki 域仅 `space-list/space-search/space-get/node-list/node-search/node-get`；doc 域仅 `+export`；drive 域仅 `+download`（三者均远端只读、产物落本地）。禁止其余一切命令。
+- **取数通道按节点 `extension` 分流（v0.6，硬规则）**：知识库文档并非全是钉钉在线文档——`doc +export` **只支持 `extension=adoc`**，对原生文件必失败。分流口径见 §6.2：
+  | `extension` | 通道 | 说明 |
+  | --- | --- | --- |
+  | `adoc` | `dws doc +export --export-format markdown` | 钉钉在线文档，导出为 markdown |
+  | 可读原生文本（`md`/`txt`） | `dws drive +download` | 原件即正文，**不得**再用 `doc +export` |
+  | 其它（`pdf`/`docx`/`xlsx`/`able`/`axls`/二进制 …） | 不取正文 | 记 `skipped` + 真实 `extension`，**不是 failure**、不伪造正文 |
+  禁止"先用 `doc +export` 试、失败再换通道"的试错式取数：通道必须由 `extension` 判定（真实返回，缺席时按 §6.2 第 2 步补查），试错会把必然失败记成 failure 并污染 manifest。
 - 本技能唯一的"写" = 本地：① 目录缓存写入/清理（M1/M3 刷新；库名不一致清理见 §5.0）② 当前审核工作集（M2）③ 临时区（正文实时取用，用后即弃）。**正文永不写入目录缓存**（红线：references/02 §1.2）。
 
 ## 3. P1 库解析（三模式共用，只读）
@@ -55,7 +63,7 @@ metadata:
 
 ## 4. P2 目录遍历（三模式共用，只读，DFS 递归）
 1. 根层 `dws wiki +node-list --workspace <ID> --page-all --format json`；对 `type=folder` 递归 `--folder <folderId> --page-all`，直至无 folder。
-2. 纪律：每层记录分页证据并写入快照；`hasChildren` 仅提示不作剪枝；folder 按 nodeId 去重（二次展开停+标注）；节点字段只取真实返回，未知 type 原样保留；体量上限 10,000 节点 / 20 层 → 停止并如实报告部分结果。
+2. 纪律：每层记录分页证据并写入快照；`hasChildren` 仅提示不作剪枝；folder 按 nodeId 去重（二次展开停+标注）；节点字段只取真实返回，未知 type 原样保留；**文档节点必须同时记录 `extension`/`contentType`**（服务端真实返回，缺席记 `null` 不推断）——它们是 §6.2 取数通道分流的唯一判据；体量上限 10,000 节点 / 20 层 → 停止并如实报告部分结果。
 3. 遍历结果 = 内存树（前序展开序）；任何一次**成功完整遍历**都更新目录缓存（P3-M1 原子替换）。
 
 ## 5. P3-M1 目录查询 → 写缓存
@@ -86,9 +94,14 @@ metadata:
    - **定位**：目录缓存 path 键命中 → 取 nodeId（快路径，不发起在线遍历）；未命中/缓存缺失 → 在线 P1+P2 全量遍历并原子更新缓存 → 重查；仍无该路径 → 记 failures（"清单项在库内不存在：<路径>"），继续后续项；
    - 单文件清单项 → 只处理精确命中的该节点；命中 folder 或歧义多节点则记 failure，不猜；
    - 目录清单项 → 展开为该目录下**全部**支持的正文文件（folder 递归至无子目录）并逐一实时下载，展开内容如实记账；
-2. **实时下载**：每个 adoc（串行）：`dws doc +export --node <nodeId> --export-format markdown`，回执 `localPath`+`sizeBytes>0` 即终态；移动为 `<案例目录>/knowledge/<同构层级路径>.md`（同 nodeId 已存在 → 原位覆盖=更新；异 nodeId 同名 → 追加 `-<nodeId前8>`）；
-3. 记账 `.crwu-manifest.jsonl`（每文件 entry：nodeId/name/type/folderPath/localPath/**exportedAt**/evidence；失败 → failure 行不中断；认证类系统性错误 → 停止，读 dingtalk-shared）；
-4. 收尾写入 `.crwu-directory.json`（目录快照副本）；摘要：成功 N / 失败 F（逐项原因）+ **清单外零下载**声明 + 产物路径。
+2. **通道判定 + 实时下载**（逐节点、串行；通道由 `extension` 决定，禁止试错）：
+   - **取 `extension`**：目录缓存条目带 `extension` → 直接用（快路径）；缺失/`null`（旧缓存）→ 对该 nodeId 补一次 `dws wiki +node-get --format json` 读真实 `extension`/`contentType`（只读、逐节点、结果写入 manifest evidence），仍为 `null` → 记 `skipped`（"类型不可判定"），**不猜、不试**；
+   - `extension=adoc` → `dws doc +export --node <nodeId> --export-format markdown`，落地为 `knowledge/<同构层级路径>.md`；
+   - `extension ∈ {md, txt}`（可读原生文本）→ `dws drive +download --node <nodeId> --output knowledge/<同构层级路径>.<extension>`，**原件即正文，不做格式转换**；
+   - 其余类型 → 记 `skipped`（原因含真实 `extension`），**不下载、不伪造正文**；
+   - 两条通道的 `--output` 均为**工作目录内相对路径**，因此命令在 `<案例目录>` 下执行；回执 `localPath`+`sizeBytes>0` 即终态；同 nodeId 已存在 → 原位覆盖=更新；异 nodeId 同名 → 追加 `-<nodeId前8>`；
+3. 记账 `.crwu-manifest.jsonl`（每文件 entry：nodeId/name/**extension**/**channel**/folderPath/localPath/**exportedAt**/evidence；`skipped` 单独成行；下载失败 → failure 行不中断；认证类系统性错误 → 停止，读 dingtalk-shared）；
+4. 收尾写入 `.crwu-directory.json`（目录快照副本）；摘要：成功 N / 跳过 S / 失败 F（逐项原因）+ **清单外零下载**声明 + 产物路径。
 > 语义：本次下载物 = 本次审核工作材料（下载时刻即最新）；跨审核/重跑一律重新下载（R2）；**禁止**写入 `dws-dir-cache`（R4）。
 
 ## 7. P3-M3 缓存兜底查找（目录可缓存 / 正文实时 / 未命中刷新；含路径寻址）
@@ -101,12 +114,12 @@ metadata:
    - 缓存缺失/损坏（JSON 解析失败等）→ 视为未命中，进入刷新。
 2. **未命中 → 刷新缓存**：重跑 P1+P2 在线全量遍历 → 原子更新缓存（§5 同款）→ **重查索引**。
 3. **刷新后仍未命中 → 报告**："未找到：<名称/nodeId>（目录已刷新至 <时间> 后仍不存在）"+ 名称相近候选（≤5 条，来自新快照），**不编造、不猜测近似即命中**。
-4. **命中且调用方要正文** → 现场实时拉取：`dws doc +export` 到本次审核工作目录或系统临时目录，登记 manifest 后仅供本次审核使用；**正文任何情况下不写入目录缓存，也不得跨审核复用**。
+4. **命中且调用方要正文** → 现场实时拉取到本次审核工作目录或系统临时目录：按 §6.2 第 2 步同一 `extension` 分流规则取数（`adoc` → `doc +export`；`md`/`txt` → `drive +download`；其余 → 如实报告"该类型不提供正文"）；登记 manifest 后仅供本次审核使用；**正文任何情况下不写入目录缓存，也不得跨审核复用**。
 5. **刷新失败降级**：在线遍历失败（认证/网络/分页未完成）→ 旧缓存可用：用旧缓存作答并显式标注"**缓存可能过期（fetched_at=<…>），刷新失败：<原因>**"；无旧缓存 → 报告"无法确认（缓存缺失且在线刷新失败）"。
 
 ## 8. P4 一致性自查
 - M1/M3 刷新：快照节点计数 == 遍历完成计数且 `failures=[]` 才写缓存/宣称全量；缓存 meta 与快照 fetched_at 一致。
-- M2：清单项 = 成功+失败（目录条目按展开计数），失败逐项原因；manifest 幂等可复跑；**清单外文件零下载**（manifest 只含清单命中项及其目录展开项）。
+- M2：清单项 = 成功 + 跳过 + 失败（目录条目按展开计数），失败逐项原因；**`skipped` 不得计入 failure**（非可读类型是正常结论，不是错误）；每个 entry 的 `channel` 必须与 `extension` 分流口径一致（`adoc`→`export`，`md`/`txt`→`download`）；manifest 幂等可复跑；**清单外文件零下载**（manifest 只含清单命中项及其目录展开项）。
 - M3 报告：必须带结论依据标签（缓存命中/刷新后命中/刷新后仍无/降级可能过期/无法确认），禁止无来源结论。
 - 缓存清理层：所用/所写缓存身份与本次目标库名一致；被清理的目录（如有）出现在摘要/结论的清理报告。
 
@@ -119,7 +132,7 @@ metadata:
 ## 10. 错误最短路径
 1. 空响应/缺失集合/分页未完成：停止后续并返回证据；不拿 `+space-search` 首页候选断言。
 2. 认证/权限/profile 错：读 `dingtalk-shared` 对应 reference；不重试猜测命令。
-3. M2 单节点导出失败：记 failures 继续；系统性（连续 >10 或认证类）→ 停止报告已得部分。
+3. M2 单节点下载失败：记 failure 继续；系统性（连续 >10 或认证类）→ 停止报告已得部分。**`extension` 非 adoc/可读文本时不得记为 failure**——那是 `skipped`；把类型不支持记成失败会掩盖真实故障。
 4. M3 缓存损坏/缺失：按 §7.1 视为未命中自动刷新；刷新也失败 → §7.5 降级，不假装权威。缓存 meta 缺失/损坏（身份不可证实）且目录名 ≠ 目标库名 → 按 §5.0 视为不一致，清理后在线重下。
 5. 缓存目录不可写：报告路径问题请用户处理；不静默改落点、不把正文改存他处以绕过红线。
 6. 未知 flag/命令：只查当前 leaf Help/一次 shortcut 清单；不跨产品试探。

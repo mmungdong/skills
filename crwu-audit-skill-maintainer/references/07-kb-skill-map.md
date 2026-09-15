@@ -48,6 +48,26 @@
 
 检查 164 个寻址键（扫描 audit 族技能目录内全部 .md 的反引号库内路径）：**全部命中本次目录**
 
+## 方法层 / 清单类 ↔ 叶子装配键映射（2026-09-15 新增）
+
+> 背景：`03-评估方法/**` 与 `06-规则库/清单-M-*`、`06-规则库/易错点库/` 属**方法层与清单类**内容；方法轴技能
+> （`crwu-audit-method-*`）仍为 `pending`，此期间由命中叶子以装配键承载。此前无此表，导致"库内有、无人装配"
+> 的整类漏装无法被发现（2026-302150-LX9757-BG8677 实测：市场法清单 `CHK-MKT-001~014` 与市场法错误要点全部未装配）。
+
+| 库内层级路径 | 类型 | 当前承载装配键（持有叶子） | registry 状态 | 本次核对 |
+| --- | --- | --- | --- | --- |
+| `03-评估方法/00-评估方法准则2019-精编/评估方法准则2019-精编条目/` | 准则正文（原生文本） | `VALUATION_METHOD_INTERFACE`（`crwu-audit-asset-realestate` §3.1①） | method=pending | 存在；通道=`drive +download` |
+| `03-评估方法/01-市场法/` | 方法说明与常见错误（原生文本） | `MARKET_METHOD_NOTES`（`crwu-audit-asset-realestate` §3.1③） | method=pending | 存在；通道=`drive +download` |
+| `03-评估方法/05-审核要点/` | 跨方法缺陷总清单（原生文本） | `METHOD_DEFECT_LIST`（`crwu-audit-asset-realestate` §3.1④） | method=pending | 存在；通道=`drive +download` |
+| `06-规则库/清单-M-市场法/` | 分区清单 `CHK-MKT-001~014`（adoc） | `MARKET_METHOD_CHECKLIST`（`crwu-audit-asset-realestate` §3.1②） | method=pending | 存在；通道=`doc +export` |
+| `06-规则库/清单-M-成本法/` | 分区清单 `CHK-CST-001~012`（adoc） | **暂无**（本类型项目作结论方法为市场法，按 `methods[]` 并集临时装配） | method=pending | 存在；**待指定承载键** |
+| `06-规则库/易错点库/` | 易错点沉淀（adoc，现为占位 README） | `PITFALL_LIBRARY`（`crwu-audit-asset-realestate` §3.1⑤） | public 方向 | 存在；内容待沉淀（回测报告 G6） |
+| `03-评估方法/02-收益法/`、`03-资产基础法/`、`04-方法选择/` | 方法说明与常见错误（原生文本） | **暂无**（报告实际采用对应方法时应由相应叶子/方法轴承载） | method=pending | 存在；**装配缺口待处理** |
+
+**守卫规则（每次对账必跑）**：知识库存在 `清单-M-*`、`易错点库/`、`03-评估方法/0X-*/` 等**方法层/清单类**目录，
+而**没有任何叶子装配键覆盖**时，记为装配缺口（`ASSEMBLY_GAP_METHOD_LAYER`），并在本表"本次核对"列写明；
+不得因为"方法轴 pending"而默认放过 —— pending 只表示技能未落地，不表示内容可以不装。
+
 ## 未登记 / 待处理 Skill
 
 （无）

@@ -114,11 +114,11 @@
 | 序号 | 页面区域 | 默认状态 | 主要回答 |
 | --- | --- | --- | --- |
 | 01 | 项目信息 | 展开 | 这是哪个项目、哪个版本、何时审核。 |
-| 02 | 审核结果概览 | 展开 | 是否通过、问题数量和优先级；**并按模块分列问题分布**；**外部数据核验单独成块**（判定项数 + 与哪一数据源出入较大），不与问题总数混列——"出入较大"分块每行必须有明确含义（源名 / `无出入（符合）` / `未取数` / `未列明来源`），行项数之和等于核验项数。 |
+| 02 | 审核结果概览 | 展开 | 是否通过、问题数量和优先级；**并按模块分列问题分布**；**外部数据核验单独成块**（判定项数 + 与数据源出入情况），不与问题总数混列——"出入较大"分块每行必须有明确含义（`同花顺 iFinD` / `无出入（符合）` / `未取数` / `未列明来源`），行项数之和等于核验项数。 |
 | 03 | 需要处理的问题 | 展开 | 改什么、为何、去哪里改。 |
 | 04 | 需要人工确认事项 | 展开 | 哪些尚不能作为确定结论。 |
 | 05 | 本次审核依据 | 展开/分组 | 本次实际用了哪些正式与内部规则。 |
-| 05b | 外部数据核验 | 展开 | 报告引用的外部数据对不对得上；与同花顺 iFinD / 万得哪一源出入较大；数据源是否可用。 |
+| 05b | 外部数据核验 | 展开 | 报告引用的外部数据对不对得上；与同花顺 iFinD 的取值出入情况；取数路径是否可用。 |
 | 06 | 人工复核对照 | 展开 | AI 与人工复核是否一致。 |
 | 06b | 本次 AI 审核六维评分卡 | 展开 | AI 自评六维分数、复审校正与 AI 审核错误项（**表格呈现**）。 |
 | 07 | 审核范围与未检查项 | 展开 | 检查了什么、没检查什么及影响。 |
@@ -391,7 +391,7 @@ AuditResult 是单一事实源。字段名推荐统一使用英文 camelCase，�
 | auditBasis | rules[], ruleMap, knowledgeBaseFiles[] | 仅列实际使用；规则引用次数可由关联关系重算。 |
 | reviewComparison | status, bands, reviewerOnlyItems, metrics | 未执行时 status=not_performed，其他字段不得伪造。 |
 | scope | inputs, checkDomains, notCheckedItems, limitations | 所有不可读与未执行项显式记录。 |
-| externalDataVerification（可选） | baseDate, unavailableDeclaration, sources[], checks[] | 缺失时页面显式显示"本次未执行外部数据核验"；存在时：`baseDate` 必填（全部取数以报告基准日为锚，禁止取数时点滚动窗口）；**基准日多候选（ROUTE003 挂起）时按候选日分别取数**——结论一致可出并注明"已在候选基准日下逐一核验，结论一致"，不一致则出"请说明"的条件性结论且不得判"不符合"；基准日缺失/不可解析时只核不依赖基准日的项，其余记"未检查"；`sources[]` 每项须有 `source/configured/authenticated/note`，**未配置或未认证的数据源必须显式声明**并在存在此类源时填写 `unavailableDeclaration`（措辞由数据提供方写入，渲染器不自造句子）；`checks[]` 每项须有 `checkId/metric/baseDate/reportValue/sources[≥1]/decision`，`decision∈{符合,不符合,请说明,未检查}`，判"不符合"须给 `reportEvidence.locator`，判"请说明"须给 `note`；**逐项写明正确与不正确**（"符合"同样入表）；`deviationAgainst` 标明与哪一数据源出入较大（**语义三态**：有出入写源名；无出入写 `—`；判定为"未检查"的写"未取数"，**不得用 `—` 混淆"没出入"与"没核"**）；未配置/未认证的源在条目中必须 `available=false`，不得作为双源复核依据。**判定为"不符合"的核验项必须同时形成 issue**（进入问题总数与"问题按模块分布"），核验区只作证据呈现，两处口径不得互相矛盾。 |
+| externalDataVerification（可选） | baseDate, unavailableDeclaration, sources[], checks[] | 缺失时页面显式显示"本次未执行外部数据核验"；存在时：`baseDate` 必填（全部取数以报告基准日为锚，禁止取数时点滚动窗口）；**基准日多候选（ROUTE003 挂起）时按候选日分别取数**——结论一致可出并注明"已在候选基准日下逐一核验，结论一致"，不一致则出"请说明"的条件性结论且不得判"不符合"；基准日缺失/不可解析时只核不依赖基准日的项，其余记"未检查"；`sources[]` 每项须有 `source/configured/authenticated/note`，本技能的唯一数据源为**同花顺 iFinD**（取数路径随宿主而异：WorkBuddy 宿主连接器 / DeepSeek Harness 的 `ifind-finance-data` 技能，实际路径写进 `note`），**该数据源不可用（两条路径都取不到）时必须显式声明**并在此时填写 `unavailableDeclaration`（措辞由数据提供方写入，渲染器不自造句子）；`checks[]` 每项须有 `checkId/metric/baseDate/reportValue/sources[≥1]/decision`，`decision∈{符合,不符合,请说明,未检查}`，判"不符合"须给 `reportEvidence.locator`，判"请说明"须给 `note`；**逐项写明正确与不正确**（"符合"同样入表）；`deviationAgainst` 标明与本项目报告值出入较大的数据源（**语义三态**：有出入写源名；无出入写 `—`；判定为"未检查"的写"未取数"，**不得用 `—` 混淆"没出入"与"没核"**）；不可用的数据源在条目中必须 `available=false`，不得作为核验依据。**本环境不启用万得、不声称双源复核**。**判定为"不符合"的核验项必须同时形成 issue**（进入问题总数与"问题按模块分布"），核验区只作证据呈现，两处口径不得互相矛盾。 |
 | professionalTrail | applicableRuleSnapshot, adjudications, checkRecords, comprehensiveComparison | 默认折叠，但保留完整证据。 |
 | fileTrace | generatedAt, rendererVersion, sourceDigest, embeddedJsonDigest | 不得包含绝对路径、nodeId 或凭据。 |
 

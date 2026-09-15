@@ -870,7 +870,7 @@
     },
     "externalDataVerification": {
       "type": "object",
-      "description": "外部数据核验区（可选）：以报告基准日为锚，声明数据源可用性并逐项给出外部数据核验结论。未配置/未认证的数据源必须在 sources[] 显式声明并给出 unavailableDeclaration。",
+      "description": "外部数据核验区（可选）：以报告基准日为锚，声明数据源可用性并逐项给出外部数据核验结论。唯一数据源为同花顺 iFinD（取数路径随宿主而异：WorkBuddy 宿主连接器 / DeepSeek Harness 的 ifind-finance-data 技能），不启用万得；数据源不可用时必须在 sources[] 显式声明并给出 unavailableDeclaration。",
       "required": [
         "baseDate",
         "sources"
@@ -943,7 +943,7 @@
               },
               "deviationAgainst": {
                 "type": "string",
-                "description": "与本项目报告值出入较大的数据源名称；无差异时写 —"
+                "description": "与本项目报告值出入较大的数据源名称（本环境即 同花顺 iFinD）；无差异时写 —"
               },
               "decision": {
                 "enum": [

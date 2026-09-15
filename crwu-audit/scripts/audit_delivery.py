@@ -74,7 +74,7 @@ EMPTY_TEXT = "本次无此类事项"
 EXT_DATA_EMPTY_TEXT = "本次未执行外部数据核验"
 EXT_DATA_NO_CHECK_TEXT = "本次无可核验的外部数据项"
 EXT_DATA_DECISIONS = ("符合", "不符合", "请说明", "未检查")
-EXT_DATA_UNAVAILABLE_TEXT = "不可用（未经双源复核）"
+EXT_DATA_UNAVAILABLE_TEXT = "不可用（未经外部数据核验）"
 EXT_DATA_NOT_FETCHED_TEXT = "未取数"
 EXT_DATA_NO_DEVIATION_TEXT = "无出入（符合）"
 EXT_DATA_UNSPECIFIED_SOURCE_TEXT = "未列明来源"
@@ -1240,7 +1240,7 @@ def _adjudication_row(record) -> str:
 def _validate_external_data(verification, errors):
     """外部数据核验区校验：基准日锚定、源可用性声明、逐项核验与判定档位。
 
-    未配置 / 未认证的数据源不得被当作双源复核依据；未配置/未认证时必须在 sources[] 显式声明。
+    不可用的数据源不得被当作核验依据；数据源不可用时必须在 sources[] 显式声明。
     """
     if not isinstance(verification, dict):
         errors.append("externalDataVerification 必须是对象")
@@ -1326,7 +1326,7 @@ def _validate_external_data(verification, errors):
                 declaration.get("configured") and declaration.get("authenticated")
             ) and item.get("available") is not False:
                 errors.append(
-                    "{0}：数据源 {1} 未配置 / 未认证，必须在条目中标记 available=false 且不得作为双源复核依据".format(
+                    "{0}：数据源 {1} 不可用（未配置 / 未认证），必须在条目中标记 available=false".format(
                         swhere, name
                     )
                 )
@@ -1400,7 +1400,7 @@ def _external_data_checks_section(verification):
 
 
 def _external_data_section(verification) -> str:
-    """《外部数据核验》区：连接器兜底声明 + 数据源可用性 + 逐项核验（正确/不正确都入表）。"""
+    """《外部数据核验》区：取数路径兜底声明 + 数据源可用性 + 逐项核验（正确/不正确都入表）。"""
     parts = ['<section id="external-data-verification">']
     parts.append("<h2>{0}</h2>".format(_text("外部数据核验")))
     if not isinstance(verification, dict) or not verification:
