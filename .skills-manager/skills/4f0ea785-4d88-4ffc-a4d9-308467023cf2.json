@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "4f0ea785-4d88-4ffc-a4d9-308467023cf2",
+  "path": "crwu-audit-asset-inventory",
+  "path_key": "crwu-audit-asset-inventory",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://gitee.com/mengdong123/crwu-ai",
+    "subpath": "skills/crwu-audit-asset-inventory",
+    "branch": null
+  }
+}
