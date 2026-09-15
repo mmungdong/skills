@@ -60,6 +60,9 @@ EXPECTED_REGISTRY_ROWS = (
 # reachable from the union algorithm without depending on any professional axis label.
 UNCONDITIONAL_PUBLIC_SKILLS = ("crwu-audit-public-general-standards",)
 
+# 能力型公共轴技能：有各自的触发条件，不得被写成恒装配。
+CONDITIONAL_PUBLIC_SKILLS = ("crwu-audit-datacheck", "crwu-audit-external-data")
+
 DISPATCH_AXES = ("scope", "asset", "business", "method", "overlay", "public")
 
 LEGACY_REGISTRY_SKILL = "crwu-audit-realestate-rent"
@@ -169,6 +172,27 @@ class AuditMultiaxisRouterContractTest(unittest.TestCase):
             "root router must not retain the active L1/L2 routing model",
         )
 
+    def test_excel_delivery_evidence_must_use_original_coordinates(self):
+        profile_path = AUDIT_SKILL_ROOT / "references/00-input-and-route-profile.md"
+        profile_text = profile_path.read_text(encoding="utf-8")
+        required_terms = (
+            "交付物中的 Excel 证据定位",
+            "必须使用 raw 原件坐标",
+            "工作版坐标仅限审核执行内部使用",
+            "映射回原件坐标",
+            "无法可靠映射",
+            "不得下发该定位",
+            "待人工确认事项",
+            "capability gap",
+        )
+        missing = [term for term in required_terms if term not in profile_text]
+
+        self.assertEqual(
+            [],
+            missing,
+            f"Excel delivery coordinate contract is incomplete: missing={missing}",
+        )
+
     def test_union_dispatch_rules_define_stable_unique_algorithm(self):
         rules_path = AUDIT_SKILL_ROOT / "references/08-union-dispatch-rules.md"
         self.assertTrue(rules_path.is_file(), f"missing union dispatch rules: {rules_path}")
@@ -251,6 +275,7 @@ class AuditMultiaxisRouterContractTest(unittest.TestCase):
                 "crwu-audit-optimize",
                 "crwu-audit-skill-maintainer",
                 "crwu-audit-datacheck",
+                "crwu-audit-external-data",
                 "crwu-audit-public-general-standards",
             }
         )
@@ -324,6 +349,79 @@ class AuditMultiaxisRouterContractTest(unittest.TestCase):
                     reference_path.is_file(),
                     f"{skill} is missing required reference: {reference}",
                 )
+
+    @_requires_skill_tree
+    def test_external_data_skill_is_registered_and_conditionally_dispatched(self):
+        """外部数据核验能力：public 轴登记 + 按收益法/市场法条件装配 + 技能自带装配与探测件齐备。"""
+        registry_text = (AUDIT_SKILL_ROOT / "references/07-skill-registry.md").read_text(encoding="utf-8")
+        rows = _registry_data_rows(registry_text)
+        self.assertIsNotNone(rows, "skill registry table must be parseable")
+        self.assertIn(
+            ("public", "外部数据核验", "crwu-audit-external-data", "available",
+             "load when methods include 收益法/市场法"),
+            rows,
+            "crwu-audit-external-data must be registered on the public axis",
+        )
+
+        rules_text = (AUDIT_SKILL_ROOT / "references/08-union-dispatch-rules.md").read_text(encoding="utf-8")
+        expression = re.search(r"public_skills\s*=\s*(?P<expression>[\s\S]*?)\n\n", rules_text)
+        self.assertIsNotNone(expression, "union dispatch rules must define the public_skills expression")
+        body = expression.group("expression")
+        self.assertIn("crwu-audit-external-data", body, "public_skills must include the external-data capability")
+        self.assertNotIn(
+            "crwu-audit-external-data] when methods",
+            body.split("crwu-audit-public-general-standards", 1)[0],
+            "conditional public skills must be declared after the unconditional one",
+        )
+
+        skill_dir = SKILLS_ROOT / "crwu-audit-external-data"
+        self.assertTrue(skill_dir.is_dir(), "missing crwu-audit-external-data skill directory")
+        for rel in ("SKILL.md", "references/00-KB装配表.md", "references/01-connector-access.md",
+                    "scripts/connector_probe.py", "scripts/test_connector_probe.py"):
+            self.assertTrue((skill_dir / rel).is_file(), f"crwu-audit-external-data is missing {rel}")
+        entry_text = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("name: crwu-audit-external-data", entry_text)
+        self.assertIn("仅经 `crwu-audit` router 编排调用，禁止单独调用", entry_text)
+        self.assertIn("06-规则库/M-外部数据核验/01-模块-外部数据核验",
+                      (skill_dir / "references/00-KB装配表.md").read_text(encoding="utf-8"),
+                      "KB assembly table must address the external-data module by in-KB path")
+
+    @_requires_skill_tree
+    def test_external_data_base_date_gate_is_tiered(self):
+        """基准日门禁必须是三档，且不得退回"挂起即整线不取数"的一刀切。
+
+        依据 08-union-dispatch-rules.md：ROUTE003 挂起 base_date 及依赖基准日的规则/结论，
+        但不按技能身份无差别停载；不依赖冲突字段的检查仍须执行。
+        """
+        entry_text = (SKILLS_ROOT / "crwu-audit-external-data/SKILL.md").read_text(encoding="utf-8")
+        for tier in ("唯一确定", "多候选（ROUTE003 挂起", "缺失 / 不可解析"):
+            self.assertIn(tier, entry_text, f"base-date gate must define tier: {tier}")
+        self.assertIn("条件性取数", entry_text, "multi-candidate tier must allow conditional fetch")
+        self.assertIn("不自行判定 ROUTE 冲突", entry_text, "the gate must defer conflict judgement to the router")
+        self.assertIn(
+            "不依赖冲突字段的规则仍须执行",
+            entry_text,
+            "the gate must not stop all checks on a hung base date",
+        )
+        self.assertNotIn(
+            "基准日本身存疑（ROUTE003 挂起）时，本技能不取数",
+            entry_text,
+            "the one-size-fits-all kill switch must not come back",
+        )
+
+    @_requires_skill_tree
+    def test_conditional_public_skills_are_not_unconditional(self):
+        rules_text = (AUDIT_SKILL_ROOT / "references/08-union-dispatch-rules.md").read_text(encoding="utf-8")
+        expression = re.search(r"public_skills\s*=\s*(?P<expression>[\s\S]*?)\n\n", rules_text)
+        self.assertIsNotNone(expression, "union dispatch rules must define the public_skills expression")
+        body = expression.group("expression")
+        for skill in CONDITIONAL_PUBLIC_SKILLS:
+            self.assertIn(skill, body, f"public_skills must declare the condition for {skill}")
+            self.assertRegex(
+                body,
+                re.compile(re.escape(skill) + r"\]\s*when\b"),
+                f"{skill} must carry an explicit trigger condition",
+            )
 
     @_requires_skill_tree
     def test_active_contracts_do_not_reference_deleted_combined_skill(self):

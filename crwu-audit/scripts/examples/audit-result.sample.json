@@ -250,6 +250,102 @@
       }
     ]
   },
+  "externalDataVerification": {
+    "baseDate": "2025-06-30",
+    "unavailableDeclaration": "本次未配置 / 未认证 万得，相关条目未经双源复核。",
+    "sources": [
+      {
+        "source": "同花顺 iFinD",
+        "configured": true,
+        "authenticated": true,
+        "note": "服务端授权；逐项取数时点见下表"
+      },
+      {
+        "source": "万得",
+        "configured": false,
+        "authenticated": false,
+        "note": "连接器未配置；相关条目未经双源复核"
+      }
+    ],
+    "checks": [
+      {
+        "checkId": "EXT-001",
+        "metric": "无风险利率（10 年期国债到期收益率）",
+        "baseDate": "2025-06-30",
+        "reportValue": "2.35%",
+        "sources": [
+          {
+            "source": "同花顺 iFinD",
+            "value": "2.03%",
+            "asOfDate": "2025-06-30",
+            "caliber": "10 年期国债到期收益率·基准日单点",
+            "available": true
+          },
+          {
+            "source": "万得",
+            "value": "—",
+            "available": false
+          }
+        ],
+        "deviationAgainst": "同花顺 iFinD",
+        "decision": "不符合",
+        "reportEvidence": {
+          "fileId": "F0000099",
+          "displayName": "评估说明.pdf",
+          "locator": "第 12 页 折现率参数表"
+        },
+        "note": "报告取值高于外部取值约 32bp（示意）"
+      },
+      {
+        "checkId": "EXT-002",
+        "metric": "可比公司 2024 年归母净利润",
+        "baseDate": "2025-06-30",
+        "reportValue": "18.26 亿元",
+        "sources": [
+          {
+            "source": "同花顺 iFinD",
+            "value": "18.26 亿元",
+            "asOfDate": "2025-06-30",
+            "caliber": "2024 年年报·归母净利润",
+            "available": true
+          },
+          {
+            "source": "万得",
+            "value": "—",
+            "available": false
+          }
+        ],
+        "deviationAgainst": "—",
+        "decision": "符合",
+        "reportEvidence": {
+          "fileId": "F0000099",
+          "displayName": "评估说明.pdf",
+          "locator": "第 18 页 可比公司表"
+        },
+        "note": "事实型数据，与同花顺一致（示意）"
+      },
+      {
+        "checkId": "EXT-003",
+        "metric": "项目级物业费实测值（三个可比实例）",
+        "baseDate": "2025-06-30",
+        "reportValue": "3.80/3.90/3.80 元/㎡·月",
+        "sources": [
+          {
+            "source": "同花顺 iFinD",
+            "value": "无覆盖",
+            "available": false
+          },
+          {
+            "source": "万得",
+            "value": "无覆盖",
+            "available": false
+          }
+        ],
+        "decision": "未检查",
+        "note": "项目级物业费无公开序列覆盖，须以询价原件/物业合同为准（示意）。"
+      }
+    ]
+  },
   "reviewComparison": {
     "status": "performed",
     "bands": {

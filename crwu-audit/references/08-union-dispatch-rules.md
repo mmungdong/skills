@@ -5,7 +5,7 @@
 
 ## 分发算法
 
-先按 02–06 得到各轴全部标签，再逐项查询 07。`available` 技能加入该轴候选列表；`pending` 或未注册标签按 10 逐标签写 gap；`profile-only` 只保留画像。公共能力独立判定，且每个公共能力有各自的触发条件：**通用准则类与报告形态、对象、业务、方法、监管均无关，恒装配**；表格勾稽类按材料是否含表格触发。
+先按 02–06 得到各轴全部标签，再逐项查询 07。`available` 技能加入该轴候选列表；`pending` 或未注册标签按 10 逐标签写 gap；`profile-only` 只保留画像。公共能力独立判定，且每个公共能力有各自的触发条件：**通用准则类与报告形态、对象、业务、方法、监管均无关，恒装配**；表格勾稽类按材料是否含表格触发；外部数据核验类按 `methods[]` 是否命中 `收益法`/`市场法` 触发（是否真正取数再由该能力按知识库 `M-外部数据核验` 表 A 三条自行判定）。
 
 ```text
 scope_skills   = available_skills(scope_types[])
@@ -15,6 +15,7 @@ method_skills  = available_skills(methods[])
 overlay_skills = available_skills(overlays[])
 public_skills  = [crwu-audit-public-general-standards]        # 恒装配：报告披露 + 程序质控
                + [crwu-audit-datacheck] when tabular materials exist
+               + [crwu-audit-external-data] when methods include 收益法 or 市场法
 
 skills_to_load = stable_unique(
   scope_skills +
@@ -84,3 +85,7 @@ skills_to_load = stable_unique(
 ### 企业价值多资产清算
 
 画像命中 `scope=企业价值`、`asset=企业价值 + 房地产 + 机器设备 + 无形资产`、`business=司法清算与补偿`。scope 轴 `企业价值` 为 profile-only（审核内容由 asset 轴承接）；`crwu-audit-asset-enterprise-value`、`crwu-audit-asset-realestate`、`crwu-audit-asset-equipment`、`crwu-audit-asset-intangible` 与 `crwu-audit-biz-judicial-liquidation-compensation` 均 available，加载。资产标签各自保留 `materiality=key|non-key|unknown`：available 且 `key` 的技能必须加载，`unknown` 保留并人工复核，`non-key` 不得删除标签但不让其主导输出。材料含表格时再并入 `crwu-audit-datacheck`。
+
+### 收益法 / 市场法项目的外部数据核验
+
+画像命中 `methods=[收益法]`（或含 `市场法`）时，`public_skills` 在恒装配的 `crwu-audit-public-general-standards` 之外再并入 `crwu-audit-external-data`；是否真正取数由该能力按知识库 `M-外部数据核验` 表 A 三条（业务线 × 资产线 × 方法线）自行判定，缺一即记"不在本模块范围"，不作为未检查项。数据源可用性（同花顺 iFinD / 万得）按该能力自带的连接器发现与调用规程探测：连接器缺失、未启用或未授权时按知识库表 D 降级（W2/W4 降为"单源 + 请说明"），并**必须在交付 HTML《外部数据核验》区显式声明**"未配置/未认证的数据源，相关条目未经双源复核"。所有取数以 `record_context.base_date` 为锚，禁止取数时点的滚动窗口。该能力只出外部数据核验意见，不下方法适用性与参数合理性判断。

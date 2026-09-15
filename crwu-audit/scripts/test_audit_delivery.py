@@ -33,6 +33,7 @@ REGION_ORDER = [
     "actionable-issues",
     "manual-confirmation-items",
     "audit-basis",
+    "external-data-verification",
     "review-comparison",
     "ai-scorecard",
     "scope-and-not-checked",
@@ -351,7 +352,120 @@ class AuditResultRenderTest(unittest.TestCase):
         for node in text_nodes(self.document):
             if re.fullmatch(r"[0-9a-f]{64}", node):
                 continue  # 渲染期计算的来源/嵌入摘要，可由输入确定性重算
+            if re.fullmatch(r"[0-9]+", node):
+                continue  # 渲染期按输入确定性重算的计数（如概览分区项数），非业务句子
             self.assertIn(node, allowed, "渲染器生成了非标签/非数据的文本：{0}".format(node))
+
+
+class ExternalDataVerificationTest(unittest.TestCase):
+    """《外部数据核验》区：数据源可用性声明 + 逐项正确/不正确 + 基准日锚定。"""
+
+    def setUp(self):
+        self.result = load_sample()
+        self.document = delivery.render(self.result)
+
+    def test_region_is_rendered_in_required_position(self):
+        self.assertIn('id="external-data-verification"', self.document)
+        positions = [
+            self.document.find('id="{0}"'.format(region)) for region in REGION_ORDER
+        ]
+        self.assertEqual(sorted(positions), positions, "外部数据核验区顺序必须符合 §3 交付结构")
+
+    def test_unconfigured_source_is_declared_in_html(self):
+        self.assertIn("本次未配置 / 未认证 万得，相关条目未经双源复核。", self.document)
+        self.assertIn("未配置", self.document)
+        self.assertIn("未授权", self.document)
+
+    def test_each_check_shows_correct_and_incorrect_with_deviation(self):
+        self.assertIn("EXTERNAL", self.document.replace("EXT-", "EXTERNAL"))  # 编号可见（示意）
+        self.assertIn("符合", self.document)
+        self.assertIn("不符合", self.document)
+        self.assertIn("同花顺 iFinD", self.document)
+        self.assertIn("2025-06-30", self.document)
+
+    def test_overview_separates_external_data_from_issue_totals(self):
+        """审核结果概览必须分列呈现：问题按模块分布 + 外部数据核验结果，不混成一句。"""
+        start = self.document.find('id="summary"')
+        end = self.document.find("</section>", start)
+        summary = self.document[start:end]
+        self.assertIn("问题按模块分布", summary)
+        self.assertIn("marketApproach", summary, "按模块分布须列出问题所属模块")
+        self.assertIn("外部数据核验结果", summary, "外部数据核验须在概览中单独成块")
+        self.assertIn("与哪一数据源出入较大", summary, "须给出与哪一源出入较大的分布")
+        self.assertNotIn("external-data-verification", summary, "概览只做分区呈现，明细仍在专区内")
+
+    def test_overview_counts_match_external_data_checks(self):
+        checks = self.result["externalDataVerification"]["checks"]
+        expected = {}
+        for check in checks:
+            expected[check["decision"]] = expected.get(check["decision"], 0) + 1
+        start = self.document.find('id="summary"')
+        end = self.document.find("</section>", start)
+        summary = self.document[start:end]
+        for decision, count in expected.items():
+            self.assertIn(
+                "<tr><td>{0}</td><td>{1}</td></tr>".format(decision, count),
+                summary,
+                "概览分区项数必须与核验条目重算一致：{0}={1}".format(decision, count),
+            )
+
+    def test_overview_deviation_block_labels_every_row(self):
+        """「与哪一数据源出入较大」不得出现无标签的 "—" 行，且各行项数须合计等于核验项数。"""
+        start = self.document.find('id="summary"')
+        end = self.document.find("</section>", start)
+        summary = self.document[start:end]
+        block = summary[summary.find("与哪一数据源出入较大"):]
+        self.assertNotIn("<tr><td>—</td>", block, "无出入/未检查必须单列，不得混进 — 行")
+        counts = [int(value) for value in re.findall(r"<td>([0-9]+)</td>", block)]
+        self.assertEqual(
+            len(self.result["externalDataVerification"]["checks"]),
+            sum(counts),
+            "出入较大分块的行项数之和必须等于核验项数",
+        )
+
+    def test_unfetched_checks_are_labelled_未取数_in_detail(self):
+        """逐项核验表中，判定为"未检查"的条目其"出入较大"列须显式写"未取数"，不用 — 混淆。"""
+        start = self.document.find('id="external-data-verification"')
+        section = self.document[start:self.document.find("</section>", start)]
+        self.assertIn("<td>{0}</td>".format(delivery.EXT_DATA_NOT_FETCHED_TEXT), section)
+
+    def test_missing_verification_renders_explicit_empty_state(self):
+        result = load_sample()
+        result.pop("externalDataVerification", None)
+        document = delivery.render(result)
+        self.assertIn('id="external-data-verification"', document)
+        self.assertIn(delivery.EXT_DATA_EMPTY_TEXT, document)
+
+    def test_required_fields_are_enforced(self):
+        result = load_sample()
+        verification = result["externalDataVerification"]
+        verification["baseDate"] = ""
+        verification["checks"][1]["decision"] = "大概符合"
+        verification["checks"][0].pop("reportEvidence")
+        errors = delivery.validate(result)
+        joined = "\n".join(errors)
+        self.assertIn("externalDataVerification.baseDate 不得为空", joined)
+        self.assertIn("decision 取值非法", joined)
+        self.assertIn("reportEvidence.locator", joined)
+
+    def test_unavailable_declaration_is_required_when_source_missing(self):
+        result = load_sample()
+        result["externalDataVerification"].pop("unavailableDeclaration", None)
+        errors = delivery.validate(result)
+        self.assertIn("unavailableDeclaration", "\n".join(errors))
+
+    def test_unavailable_source_cannot_be_used_as_second_source(self):
+        result = load_sample()
+        check = result["externalDataVerification"]["checks"][0]
+        check["sources"][1].pop("available", None)
+        errors = delivery.validate(result)
+        self.assertIn("未配置 / 未认证", "\n".join(errors))
+
+    def test_source_must_be_declared(self):
+        result = load_sample()
+        result["externalDataVerification"]["checks"][0]["sources"][0]["source"] = "某未声明源"
+        errors = delivery.validate(result)
+        self.assertIn("未在 externalDataVerification.sources 中声明", "\n".join(errors))
 
 
 class AuditDeliveryCliTest(unittest.TestCase):

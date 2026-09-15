@@ -868,6 +868,146 @@
         }
       }
     },
+    "externalDataVerification": {
+      "type": "object",
+      "description": "外部数据核验区（可选）：以报告基准日为锚，声明数据源可用性并逐项给出外部数据核验结论。未配置/未认证的数据源必须在 sources[] 显式声明并给出 unavailableDeclaration。",
+      "required": [
+        "baseDate",
+        "sources"
+      ],
+      "properties": {
+        "baseDate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unavailableDeclaration": {
+          "type": "string",
+          "description": "存在未配置/未认证数据源时必须填写（兜底声明由数据提供方写入，渲染器不自造句子）"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "source",
+              "configured",
+              "authenticated",
+              "note"
+            ],
+            "properties": {
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "configured": {
+                "type": "boolean"
+              },
+              "authenticated": {
+                "type": "boolean"
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "checkId",
+              "metric",
+              "baseDate",
+              "reportValue",
+              "sources",
+              "decision"
+            ],
+            "properties": {
+              "checkId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "metric": {
+                "type": "string",
+                "minLength": 1
+              },
+              "baseDate": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reportValue": {
+                "type": "string",
+                "minLength": 1
+              },
+              "deviationAgainst": {
+                "type": "string",
+                "description": "与本项目报告值出入较大的数据源名称；无差异时写 —"
+              },
+              "decision": {
+                "enum": [
+                  "符合",
+                  "不符合",
+                  "请说明",
+                  "未检查"
+                ]
+              },
+              "note": {
+                "type": "string"
+              },
+              "reportEvidence": {
+                "type": "object",
+                "description": "判定为“不符合”时必须给出 locator",
+                "properties": {
+                  "fileId": {
+                    "type": "string"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "locator": {
+                    "type": "string"
+                  }
+                }
+              },
+              "sources": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "source",
+                    "value"
+                  ],
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "asOfDate": {
+                      "type": "string"
+                    },
+                    "caliber": {
+                      "type": "string",
+                      "description": "取数口径（期限/窗口/频率/基准/复权等）"
+                    },
+                    "available": {
+                      "type": "boolean",
+                      "description": "该源未配置/未认证时必须为 false"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "scope": {
       "type": "object",
       "required": [

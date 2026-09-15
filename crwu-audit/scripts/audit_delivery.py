@@ -71,6 +71,13 @@ CONFIDENCE_LABEL = {"high": "高", "medium": "中", "low": "低"}
 REVIEW_STATUS_LABEL = {"not_performed": "未执行", "performed": "已执行"}
 
 EMPTY_TEXT = "本次无此类事项"
+EXT_DATA_EMPTY_TEXT = "本次未执行外部数据核验"
+EXT_DATA_NO_CHECK_TEXT = "本次无可核验的外部数据项"
+EXT_DATA_DECISIONS = ("符合", "不符合", "请说明", "未检查")
+EXT_DATA_UNAVAILABLE_TEXT = "不可用（未经双源复核）"
+EXT_DATA_NOT_FETCHED_TEXT = "未取数"
+EXT_DATA_NO_DEVIATION_TEXT = "无出入（符合）"
+EXT_DATA_UNSPECIFIED_SOURCE_TEXT = "未列明来源"
 
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 ABSOLUTE_PATH_PATTERNS = [
@@ -741,6 +748,10 @@ def validate(result: dict, rendered: bool = False, expect_renderer: bool = False
     if not _is_nonempty_str(summary.get("narrative")):
         errors.append("summary.narrative 不得为空")
 
+    # externalDataVerification（外部数据核验：基准日锚定 + 源可用性声明 + 逐项核验）
+    if result.get("externalDataVerification") is not None:
+        _validate_external_data(result.get("externalDataVerification"), errors)
+
     # fileTrace（§10 / §12）
     file_trace = result.get("fileTrace") or {}
     if not _is_nonempty_str(file_trace.get("generatedAt")):
@@ -1226,6 +1237,287 @@ def _adjudication_row(record) -> str:
     )
 
 
+def _validate_external_data(verification, errors):
+    """外部数据核验区校验：基准日锚定、源可用性声明、逐项核验与判定档位。
+
+    未配置 / 未认证的数据源不得被当作双源复核依据；未配置/未认证时必须在 sources[] 显式声明。
+    """
+    if not isinstance(verification, dict):
+        errors.append("externalDataVerification 必须是对象")
+        return
+    if not _is_nonempty_str(verification.get("baseDate")):
+        errors.append("externalDataVerification.baseDate 不得为空（外部数据核验必须以报告基准日为锚）")
+
+    sources = verification.get("sources")
+    if sources is None:
+        sources = []
+    if not isinstance(sources, list):
+        errors.append("externalDataVerification.sources 必须是数组")
+        sources = []
+    declared = {}
+    for index, item in enumerate(sources):
+        where = "externalDataVerification.sources[{0}]".format(index)
+        if not isinstance(item, dict):
+            errors.append("{0} 必须是对象".format(where))
+            continue
+        for field in ("source", "note"):
+            if not _is_nonempty_str(item.get(field)):
+                errors.append("{0}.{1} 不得为空".format(where, field))
+        for field in ("configured", "authenticated"):
+            if not isinstance(item.get(field), bool):
+                errors.append("{0}.{1} 必须是布尔值".format(where, field))
+        declared[str(item.get("source"))] = item
+
+    checks = verification.get("checks")
+    if checks is None:
+        checks = []
+    if not isinstance(checks, list):
+        errors.append("externalDataVerification.checks 必须是数组")
+        return
+    if not sources and not checks:
+        errors.append("externalDataVerification 至少要有 sources 或 checks 之一，不得空返")
+
+    unavailable = [
+        item
+        for item in sources
+        if isinstance(item, dict) and not (item.get("configured") and item.get("authenticated"))
+    ]
+    if unavailable and not _is_nonempty_str(verification.get("unavailableDeclaration")):
+        errors.append(
+            "externalDataVerification.unavailableDeclaration 在存在未配置 / 未认证数据源时不得为空"
+            "（兜底声明须由数据提供方写入，渲染器不自造句子）"
+        )
+
+    for index, check in enumerate(checks):
+        where = "externalDataVerification.checks[{0}]".format(index)
+        if not isinstance(check, dict):
+            errors.append("{0} 必须是对象".format(where))
+            continue
+        for field in ("checkId", "metric", "reportValue", "decision", "baseDate"):
+            if not _is_nonempty_str(check.get(field)):
+                errors.append("{0}.{1} 不得为空".format(where, field))
+        if check.get("decision") not in EXT_DATA_DECISIONS:
+            errors.append("{0}.decision 取值非法：{1}".format(where, check.get("decision")))
+        if check.get("decision") == "请说明" and not _is_nonempty_str(check.get("note")):
+            errors.append("{0}.note 在判定为“请说明”时不得为空".format(where))
+        evidence = check.get("reportEvidence")
+        if check.get("decision") == "不符合":
+            if not isinstance(evidence, dict) or not _is_nonempty_str(evidence.get("locator")):
+                errors.append("{0}.reportEvidence.locator 在判定为“不符合”时不得为空".format(where))
+        elif evidence is not None and not isinstance(evidence, dict):
+            errors.append("{0}.reportEvidence 必须是对象".format(where))
+
+        items = check.get("sources")
+        if not isinstance(items, list) or not items:
+            errors.append("{0}.sources 必须是非空数组".format(where))
+            continue
+        for sindex, item in enumerate(items):
+            swhere = "{0}.sources[{1}]".format(where, sindex)
+            if not isinstance(item, dict):
+                errors.append("{0} 必须是对象".format(swhere))
+                continue
+            if not _is_nonempty_str(item.get("source")) or not _is_nonempty_str(item.get("value")):
+                errors.append("{0}.source / value 不得为空".format(swhere))
+            name = str(item.get("source"))
+            declaration = declared.get(name)
+            if declared and declaration is None:
+                errors.append("{0}.source 未在 externalDataVerification.sources 中声明：{1}".format(swhere, name))
+            elif declaration is not None and not (
+                declaration.get("configured") and declaration.get("authenticated")
+            ) and item.get("available") is not False:
+                errors.append(
+                    "{0}：数据源 {1} 未配置 / 未认证，必须在条目中标记 available=false 且不得作为双源复核依据".format(
+                        swhere, name
+                    )
+                )
+
+
+def _external_data_sources_section(verification):
+    parts = []
+    sources = verification.get("sources") or []
+    if not sources:
+        return ""
+    parts.append("<h4>{0}</h4>".format(_text("数据源可用性")))
+    parts.append(
+        "<table><thead><tr><th>{0}</th><th>{1}</th><th>{2}</th><th>{3}</th></tr></thead><tbody>".format(
+            _text("数据源"), _text("是否配置"), _text("是否已授权"), _text("说明")
+        )
+    )
+    for item in sources:
+        parts.append(
+            "<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td></tr>".format(
+                _text(item.get("source")),
+                _text("已配置" if item.get("configured") else "未配置"),
+                _text("已授权" if item.get("authenticated") else "未授权"),
+                _text(item.get("note")),
+            )
+        )
+    parts.append("</tbody></table>")
+    return "".join(parts)
+
+
+def _external_data_checks_section(verification):
+    checks = verification.get("checks") or []
+    parts = ["<h4>{0}</h4>".format(_text("逐项核验"))]
+    if not checks:
+        parts.append('<p class="empty">{0}</p>'.format(_text(EXT_DATA_NO_CHECK_TEXT)))
+        return "".join(parts)
+
+    header = ["编号", "数据项", "报告值", "数据源", "取值", "口径", "基准日", "出入较大", "判定", "说明"]
+    parts.append(
+        "<table><thead><tr>{0}</tr></thead><tbody>".format(
+            "".join("<th>{0}</th>".format(_text(cell)) for cell in header)
+        )
+    )
+    for check in checks:
+        base_date = check.get("baseDate") or verification.get("baseDate")
+        deviation = check.get("deviationAgainst")
+        if not _is_nonempty_str(deviation) or str(deviation).strip() == "—":
+            # 归一化："未检查"的项一律显示"未取数"，不得与"无出入"共用 — 号
+            deviation = EXT_DATA_NOT_FETCHED_TEXT if check.get("decision") == "未检查" else "—"
+        tail = [
+            _text(base_date),
+            _text(deviation),
+            _text(check.get("decision")),
+            _text(check.get("note")),
+        ]
+        for item in check.get("sources") or []:
+            if item.get("available") is False:
+                value_cell = _text(EXT_DATA_UNAVAILABLE_TEXT)
+            else:
+                value_cell = _text(item.get("value"))
+            cells = [
+                _text(check.get("checkId")),
+                _text(check.get("metric")),
+                _text(check.get("reportValue")),
+                _text(item.get("source")),
+                value_cell,
+                _text(item.get("caliber") or item.get("asOfDate") or ""),
+            ] + tail
+            parts.append("<tr>{0}</tr>".format("".join("<td>{0}</td>".format(cell) for cell in cells)))
+    parts.append("</tbody></table>")
+    return "".join(parts)
+
+
+def _external_data_section(verification) -> str:
+    """《外部数据核验》区：连接器兜底声明 + 数据源可用性 + 逐项核验（正确/不正确都入表）。"""
+    parts = ['<section id="external-data-verification">']
+    parts.append("<h2>{0}</h2>".format(_text("外部数据核验")))
+    if not isinstance(verification, dict) or not verification:
+        parts.append('<p class="empty">{0}</p>'.format(_text(EXT_DATA_EMPTY_TEXT)))
+        parts.append("</section>")
+        return "".join(parts)
+
+    unavailable = [
+        item
+        for item in (verification.get("sources") or [])
+        if not (item.get("configured") and item.get("authenticated"))
+    ]
+    declaration = verification.get("unavailableDeclaration")
+    if unavailable and _is_nonempty_str(declaration):
+        parts.append('<p class="banner">{0}</p>'.format(_text(declaration)))
+    parts.append('<table class="kv">{0}</table>'.format(_rows([("基准日", verification.get("baseDate"))])))
+    parts.append(_external_data_sources_section(verification))
+    parts.append(_external_data_checks_section(verification))
+    parts.append("</section>")
+    return "".join(parts)
+
+
+def _summary_breakdown_section(rendered_result) -> str:
+    """概览分区：问题按模块分布 + 外部数据核验结果（分列呈现，不与问题总数混列）。
+
+    全部由既有数据确定性推导（issues[].module / externalDataVerification.checks），
+    不新增冻结字段、不引入人工撰写的句子。
+    """
+    parts = []
+    issues = rendered_result.get("issues") or []
+    if issues:
+        order = []
+        stats = {}
+        for issue in issues:
+            module = str(issue.get("module") or "")
+            if module not in stats:
+                stats[module] = {"total": 0, "high": 0, "medium": 0, "low": 0}
+                order.append(module)
+            stats[module]["total"] += 1
+            severity = issue.get("severity")
+            if severity in ("high", "medium", "low"):
+                stats[module][severity] += 1
+        parts.append("<h4>{0}</h4>".format(_text("问题按模块分布")))
+        parts.append(
+            "<table><thead><tr><th>{0}</th><th>{1}</th><th>{2}</th><th>{3}</th><th>{4}</th></tr></thead><tbody>".format(
+                _text("模块"), _text("问题数"), _text("高"), _text("中"), _text("低")
+            )
+        )
+        for module in sorted(order, key=lambda name: (-stats[name]["total"], name)):
+            row = stats[module]
+            parts.append(
+                "<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td></tr>".format(
+                    _text(module), _text(row["total"]), _text(row["high"]),
+                    _text(row["medium"]), _text(row["low"]),
+                )
+            )
+        parts.append("</tbody></table>")
+
+    verification = rendered_result.get("externalDataVerification") or {}
+    checks = verification.get("checks") or []
+    if isinstance(checks, list) and checks:
+        counts = {}
+        for check in checks:
+            decision = str(check.get("decision") or "")
+            counts[decision] = counts.get(decision, 0) + 1
+        parts.append("<h4>{0}</h4>".format(_text("外部数据核验结果")))
+        parts.append(
+            "<table><thead><tr><th>{0}</th><th>{1}</th></tr></thead><tbody>".format(_text("判定"), _text("项数"))
+        )
+        for decision in EXT_DATA_DECISIONS:
+            if counts.get(decision):
+                parts.append(
+                    "<tr><td>{0}</td><td>{1}</td></tr>".format(_text(decision), _text(counts[decision]))
+                )
+        parts.append("</tbody></table>")
+
+        deviating = {}
+        no_deviation = 0
+        not_fetched = 0
+        unspecified = 0
+        for check in checks:
+            against = str(check.get("deviationAgainst") or "").strip()
+            decision = str(check.get("decision") or "")
+            if against and against != "—":
+                deviating[against] = deviating.get(against, 0) + 1
+            elif decision == "未检查":
+                not_fetched += 1
+            elif decision == "符合":
+                no_deviation += 1
+            else:
+                unspecified += 1
+        parts.append("<h4>{0}</h4>".format(_text("与哪一数据源出入较大")))
+        parts.append(
+            "<table><thead><tr><th>{0}</th><th>{1}</th></tr></thead><tbody>".format(_text("数据源"), _text("项数"))
+        )
+        for name in sorted(deviating, key=lambda item: (-deviating[item], item)):
+            parts.append(
+                "<tr><td>{0}</td><td>{1}</td></tr>".format(_text(name), _text(deviating[name]))
+            )
+        if no_deviation:
+            parts.append(
+                "<tr><td>{0}</td><td>{1}</td></tr>".format(_text(EXT_DATA_NO_DEVIATION_TEXT), _text(no_deviation))
+            )
+        if not_fetched:
+            parts.append(
+                "<tr><td>{0}</td><td>{1}</td></tr>".format(_text(EXT_DATA_NOT_FETCHED_TEXT), _text(not_fetched))
+            )
+        if unspecified:
+            parts.append(
+                "<tr><td>{0}</td><td>{1}</td></tr>".format(
+                    _text(EXT_DATA_UNSPECIFIED_SOURCE_TEXT), _text(unspecified)
+                )
+            )
+        parts.append("</tbody></table>")
+    return "".join(parts)
+
+
 def render(result: dict, print_trail: bool = None) -> str:
     """确定性渲染：文本节点只来自受控标签或输入数据，不生成新的业务句子。"""
     rendered_result = json.loads(json.dumps(result, ensure_ascii=False))
@@ -1319,6 +1611,7 @@ def render(result: dict, print_trail: bool = None) -> str:
             )
         )
     )
+    parts.append(_summary_breakdown_section(rendered_result))
     parts.append("</section>")
 
     # 03 需要处理的问题
@@ -1368,6 +1661,9 @@ def render(result: dict, print_trail: bool = None) -> str:
             + "</ul>"
         )
     parts.append("</section>")
+
+    # 05.5 外部数据核验（基准日锚定 + 源可用性声明 + 逐项核验）
+    parts.append(_external_data_section(rendered_result.get("externalDataVerification")))
 
     # 06 人工复核对照
     parts.append('<section id="review-comparison">')

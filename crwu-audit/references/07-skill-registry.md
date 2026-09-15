@@ -45,6 +45,7 @@
 | overlay | 金融/银行 | crwu-audit-overlay-financial | pending | record gap |
 | public | 通用准则 | crwu-audit-public-general-standards | available | load always |
 | public | 表格勾稽 | crwu-audit-datacheck | available | load when tabular materials exist |
+| public | 外部数据核验 | crwu-audit-external-data | available | load when methods include 收益法/市场法 |
 
 ## 维护约束
 

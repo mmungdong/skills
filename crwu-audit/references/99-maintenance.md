@@ -15,7 +15,7 @@
 | `methods[]`、方法角色与结论方法 | `05-method-classification.md` |
 | `overlays[]` 与 ROUTE001–004 | `06-overlay-classification.md` |
 | `axis+label` 技能名、状态与加载行为 | `07-skill-registry.md` |
-| 稳定并集、pending/冲突执行边界与结果来源 | `08-union-dispatch-rules.md` |
+| 稳定并集、公共能力触发（通用准则恒装配 / 表格勾稽 / 外部数据核验）、pending/冲突执行边界与结果来源 | `08-union-dispatch-rules.md` |
 | A/B/C 机构审核风险分类 | `09-review-risk-classification.md` |
 | 能力 gap 与待建提案 | `10-capability-gap-proposal.md` |
 | 送达与交付层规范（AuditResult/单文件 HTML、双证据链、两阶段门禁、验收清单） | `11-html-delivery-spec.md` |
