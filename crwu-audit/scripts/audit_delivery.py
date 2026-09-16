@@ -182,6 +182,10 @@ CHECK_RECORD_REQUIRED = [
 REVIEWER_ONLY_REQUIRED = ["itemId", "title", "reviewerEvidence", "handling", "inFileResolution"]
 # 能力边界条目：AI 当前不具备该层能力（如底稿审核），不计分母/不计漏检，但必须登记备查并渲染
 OUT_OF_SCOPE_REQUIRED = ["itemId", "title", "reviewerEvidence", "handling", "exclusionReason"]
+# 工具能力声明（受控常量，非业务结论）：必须在每份交付件中显式出现
+CAPABILITY_WORKPAPER_NOTICE = (
+    "本工具当前暂不支持底稿文件审核：底稿类复核意见不计入 AI 命中率，仅登记备查并交人工底稿审核。"
+)
 # ---- AI 审核评分卡（自评；量化工种差距。维度与算法为技能内受控取值，知识库暂无对应词表） ----
 SCORECARD_DIMENSIONS = [
     ("first_delivery_correctness", "首轮交付正确性"),
@@ -769,6 +773,12 @@ def validate(result: dict, rendered: bool = False, expect_renderer: bool = False
                 for field in ("file", "locator"):
                     if not _is_nonempty_str(in_file.get(field)):
                         errors.append("{0}.{1} 必须给出在件核验证据".format(where, field))
+                # AI 未命中而按「已落实」剔除分母时，必须给出在件原文证明该事项确已修改/不存在
+                if resolution == "L-resolved" and item.get("matchStatus") == "miss":
+                    if not _is_nonempty_str(in_file.get("quote")):
+                        errors.append(
+                            "{0}.inFileEvidence.quote 不得为空：AI 未命中且按 L-resolved 剔除分母时，"
+                            "必须给出在件原文，证明该意见确已修改/已不存在（无法证明的应按 L-open 计入漏检）".format(where))
             if resolution == "L-unclosed":
                 closure = item.get("closureEvidence") or {}
                 for field in ("file", "locator"):
@@ -1473,6 +1483,7 @@ def _review_comparison_section(comparison) -> str:
         return "".join(parts)
     metrics = _review_metrics(items)
     unclosed = sum(item.get("inFileResolution") == "L-unclosed" for item in items)
+    parts.append('<p class="formula capability-notice">{0}</p>'.format(_text(CAPABILITY_WORKPAPER_NOTICE)))
     parts.append('<div class="review-kpis">')
     for label, value, cls in (
         ("复核意见", metrics["total"], ""), ("已验证修改", metrics["resolved"], "good"),
@@ -1490,6 +1501,7 @@ def _review_comparison_section(comparison) -> str:
         _text("精确命中率"), _text(_format_rate(metrics["exactRate"])),
         _text("部分命中计为命中、只是层次较低；已验证修改和无法核验项不进入分母。")))
     parts.append(_hit_level_row(metrics))
+    parts.append(_excluded_from_denominator_block(comparison))
     if unclosed:
         parts.append('<p class="closure-alert"><strong>{0}</strong>{1}</p>'.format(
             _text("已称修复但实际未落实"), _text("：{0} 条，须优先回客户。".format(unclosed))))
@@ -1522,6 +1534,42 @@ def _review_comparison_section(comparison) -> str:
         parts.append("</details></section>")
     parts.append(_out_of_scope_block(comparison))
     parts.append("</section>")
+    return "".join(parts)
+
+
+def _excluded_from_denominator_block(comparison) -> str:
+    """分母剔除清单：逐条说明命中率分母为何小于复核条数，并给出在件依据。"""
+    items = comparison.get("reviewItems") or []
+    out_of_scope = comparison.get("outOfScopeItems") or []
+    rows = []
+    for resolution, label in (
+        ("L-resolved", "已修改/已落实 · 不计入分母"),
+        ("L-uncheckable", "材料缺失或不可读 · 不计入分母"),
+    ):
+        for item in items:
+            if item.get("inFileResolution") != resolution:
+                continue
+            evidence = item.get("inFileEvidence") or {}
+            rows.append((label, item.get("itemId"), item.get("title"),
+                         evidence.get("file") or IN_FILE_ABSENT_LABEL,
+                         evidence.get("locator") or IN_FILE_ABSENT_LABEL,
+                         REVIEW_MATCH_LABEL.get(item.get("matchStatus"), item.get("matchStatus"))))
+    for item in out_of_scope:
+        rows.append(("能力边界 · 登记备查", item.get("itemId"), item.get("title"),
+                     item.get("exclusionReason"), item.get("handling"), "不计分"))
+    if not rows:
+        return ""
+    parts = ['<details class="review-excluded"><summary>{0}</summary>'.format(
+        _text("展开不计入命中率分母的条目（共 {0} 条）".format(len(rows))))]
+    parts.append('<p class="formula">{0}</p>'.format(
+        _text("命中率分母 = 复核条数 − 已修改/已落实 − 材料缺失或不可读 − 能力边界；下列条目逐条给出剔除依据。")))
+    parts.append('<div class="table-scroll"><table><thead><tr>' + "".join(
+        '<th scope="col">{0}</th>'.format(_text(label))
+        for label in ("剔除依据", "编号", "条目", "在件文件/依据", "在件定位/处理", "AI 对照")
+    ) + "</tr></thead><tbody>")
+    for row in rows:
+        parts.append("<tr>" + "".join("<td>{0}</td>".format(_text(cell)) for cell in row) + "</tr>")
+    parts.append("</tbody></table></div></details>")
     return "".join(parts)
 
 

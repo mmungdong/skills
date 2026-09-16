@@ -552,6 +552,7 @@ class AuditResultRenderTest(unittest.TestCase):
                 r"命中率：\([0-9]+ \+ [0-9]+\) ÷ [0-9]+ = [0-9]+(?:\.[0-9])?%；精确命中率：[0-9]+(?:\.[0-9])?%。部分命中计为命中、只是层次较低；已验证修改和无法核验项不进入分母。",
                 r"命中率：\([0-9]+ \+ [0-9]+\) ÷ [0-9]+。部分命中计为命中、只是层次较低；已验证修改和无法核验项不进入分母；综合值按全部有效明细汇总，不取各维度百分比平均。",
                 r"(精确命中|部分命中|未命中)：[0-9]+ / [0-9]+（[0-9]+(?:\.[0-9])?%）",
+                r"展开不计入命中率分母的条目（共 [0-9]+ 条）",
                 r"[0-9]+(?:\.[0-9])?%",
                 r"[0-9]+ ÷ [0-9]+",
             )):
@@ -808,6 +809,30 @@ class StructuredReviewComparisonTest(unittest.TestCase):
         self.assertEqual(metrics["hitRate"], 50.0)
         self.assertEqual(metrics["exactRate"], 0.0)
         self.assertNotEqual(metrics["hitRate"], metrics["exactRate"])
+
+    def test_workpaper_capability_notice_is_always_rendered(self):
+        """交付件必须明确说明暂不支持底稿文件审核，且底稿意见不计入 AI 命中率。"""
+        document = delivery.render(with_structured_review_comparison())
+        self.assertIn(delivery.CAPABILITY_WORKPAPER_NOTICE, document)
+        self.assertIn("本工具当前暂不支持底稿文件审核", document)
+
+    def test_denominator_exclusions_are_listed_with_evidence(self):
+        """分母剔除清单：已修改/已落实与材料缺失项逐条给出剔除依据，使分母可审计。"""
+        document = delivery.render(with_structured_review_comparison())
+        self.assertIn("展开不计入命中率分母的条目（共 2 条）", document)
+        self.assertIn("已修改/已落实 · 不计入分母", document)
+        self.assertIn("材料缺失或不可读 · 不计入分母", document)
+
+    def test_miss_with_resolved_requires_in_file_proof(self):
+        """AI 未命中而按 L-resolved 剔除分母时，必须给出在件原文证明已修改，否则应按 L-open 计入漏检。"""
+        result = with_structured_review_comparison()
+        item = result["reviewComparison"]["reviewItems"][1]  # RV-002：miss + L-resolved
+        self.assertEqual("miss", item["matchStatus"])
+        self.assertEqual("L-resolved", item["inFileResolution"])
+        item["inFileEvidence"].pop("quote")
+        errors = delivery.validate(result)
+        self.assertTrue(
+            any("必须给出在件原文" in e and "L-resolved" in e for e in errors), errors)
 
     def test_out_of_scope_items_are_registered_and_rendered(self):
         """能力边界条目：不计分但必须登记备查、可见可展开，且不得混入命中率明细。"""
