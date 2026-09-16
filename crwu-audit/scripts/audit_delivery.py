@@ -70,6 +70,37 @@ REVIEW_CATEGORY_LABEL = {
 }
 REVIEWER_ONLY_LABEL = "仅人工复核发现"
 REVIEW_MATCH_VALUES = {"exact", "partial", "miss"}
+# AI 对照说明（受控常量）：逐条讲清「AI 命中与否」与「是否计入命中率分母」的因果，
+# 特别是「AI 未命中 + 复核件标注已修改」时必须核验是否确已修改，并给出两种分支的后果。
+AI_COMPARISON_NOTE = {
+    ("miss", "L-resolved"):
+        "AI 未命中｜复核件标注该项「已修改」：已按在件核验确认该项确已修改（复核事项在被审件中已不存在）→ 不计入命中率分母；"
+        "若核验发现并未修改，则须计入分母并计为 AI 漏检",
+    ("miss", "L-open"):
+        "AI 未命中｜已在件核验：该项并未修改 → 计入命中率分母，计为 AI 漏检",
+    ("miss", "L-unclosed"):
+        "AI 未命中｜答复称已改但被审件未落地：计入命中率分母并计为漏检，优先回客户",
+    ("miss", "L-uncheckable"):
+        "AI 未命中｜材料缺失或不可读·未能核验：不计入命中率分母，登记为未检查项（未核≠未命中）",
+    ("exact", "L-resolved"):
+        "AI 精确命中｜复核意见在被审件中已落实：不计入命中率分母（作人工工作成果呈现）",
+    ("partial", "L-resolved"):
+        "AI 部分命中｜复核意见在被审件中已落实：不计入命中率分母（作人工工作成果呈现）",
+    ("exact", "L-open"):
+        "AI 精确命中｜被审件未落实：计入命中率分母",
+    ("partial", "L-open"):
+        "AI 部分命中｜被审件未落实：计入命中率分母",
+    ("exact", "L-unclosed"):
+        "AI 精确命中｜答复称已改但被审件未落地：计入命中率分母，优先回客户",
+    ("partial", "L-unclosed"):
+        "AI 部分命中｜答复称已改但被审件未落地：计入命中率分母，优先回客户",
+    ("exact", "L-uncheckable"):
+        "AI 精确命中｜材料缺失或不可读·未能核验：不计入命中率分母，登记为未检查项",
+    ("partial", "L-uncheckable"):
+        "AI 部分命中｜材料缺失或不可读·未能核验：不计入命中率分母，登记为未检查项",
+}
+AI_COMPARISON_NOTE_FALLBACK = "AI 对照状态未完整标注（matchStatus / inFileResolution 缺失）"
+
 HIT_LEVEL_LABEL = [
     ("exact", "精确命中"),
     ("partial", "部分命中"),
@@ -1442,7 +1473,9 @@ def _review_item_card(item) -> str:
     rows = [
         ("编号", item.get("itemId")),
         ("问题方向", item.get("module")),
-        ("AI 对照", REVIEW_MATCH_LABEL.get(item.get("matchStatus"), item.get("matchStatus"))),
+        ("AI 对照", AI_COMPARISON_NOTE.get(
+            (item.get("matchStatus"), item.get("inFileResolution")),
+            REVIEW_MATCH_LABEL.get(item.get("matchStatus"), item.get("matchStatus")))),
         ("复核条目范围", scope_label),
         ("AI 命中内容", "；".join(explanation.get("matchedAspects") or []) or "（无）"),
         ("AI 未命中内容", "；".join(explanation.get("unmatchedAspects") or []) or "（无）"),
@@ -1484,6 +1517,10 @@ def _review_comparison_section(comparison) -> str:
     metrics = _review_metrics(items)
     unclosed = sum(item.get("inFileResolution") == "L-unclosed" for item in items)
     parts.append('<p class="formula capability-notice">{0}</p>'.format(_text(CAPABILITY_WORKPAPER_NOTICE)))
+    parts.append('<p class="formula">{0}</p>'.format(
+        _text("分母判定：AI 未命中的复核意见，须先核验该事项是否已被修改——" 
+              "确已修改的（复核件标注已修改且在件核验通过）不计入命中率分母；并未修改的计入分母并计为漏检。" 
+              "材料缺失或不可读、超出 AI 能力层的条目不进入分母。逐条结论见下表「AI 对照」。")))
     parts.append('<div class="review-kpis">')
     for label, value, cls in (
         ("复核意见", metrics["total"], ""), ("已验证修改", metrics["resolved"], "good"),

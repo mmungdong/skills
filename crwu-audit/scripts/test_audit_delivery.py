@@ -823,6 +823,27 @@ class StructuredReviewComparisonTest(unittest.TestCase):
         self.assertIn("已修改/已落实 · 不计入分母", document)
         self.assertIn("材料缺失或不可读 · 不计入分母", document)
 
+    def test_ai_comparison_states_both_branches_for_miss_marked_modified(self):
+        """AI 未命中且复核件标注已修改时，AI 对照必须写清两种分支与分母后果。"""
+        document = delivery.render(with_structured_review_comparison())
+        self.assertIn("AI 未命中｜复核件标注该项「已修改」", document)
+        self.assertIn("已按在件核验确认该项确已修改（复核事项在被审件中已不存在）→ 不计入命中率分母", document)
+        self.assertIn("若核验发现并未修改，则须计入分母并计为 AI 漏检", document)
+        # 答复称已改但未落地的未命中项同样计入分母
+        self.assertIn("AI 未命中｜答复称已改但被审件未落地：计入命中率分母并计为漏检，优先回客户", document)
+        # 区块图例必须说明该规则
+        self.assertIn("分母判定：AI 未命中的复核意见，须先核验该事项是否已被修改", document)
+
+    def test_ai_comparison_marks_unmodified_miss_as_counted(self):
+        """AI 未命中且核验确认并未修改的，必须写明计入分母并计为漏检。"""
+        result = with_structured_review_comparison()
+        item = result["reviewComparison"]["reviewItems"][2]  # RV-003：miss + L-unclosed
+        item["inFileResolution"] = "L-open"
+        item.pop("closureEvidence", None)
+        self.assertEqual([], delivery.validate(result))
+        document = delivery.render(result)
+        self.assertIn("AI 未命中｜已在件核验：该项并未修改 → 计入命中率分母，计为 AI 漏检", document)
+
     def test_miss_with_resolved_requires_in_file_proof(self):
         """AI 未命中而按 L-resolved 剔除分母时，必须给出在件原文证明已修改，否则应按 L-open 计入漏检。"""
         result = with_structured_review_comparison()
