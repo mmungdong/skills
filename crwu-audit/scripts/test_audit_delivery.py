@@ -458,6 +458,38 @@ class AuditResultRenderTest(unittest.TestCase):
         self.assertLess(first_issue.find("问题描述"), first_issue.find("展开修改意见（共 1 项）"))
         self.assertLess(first_issue.find("展开修改意见（共 1 项）"), first_issue.find("建议修改"))
 
+    def test_ai_only_issues_are_highlighted_and_summarized_by_severity(self):
+        document = delivery.render(with_structured_review_comparison())
+        start = document.find('id="actionable-issues"')
+        end = document.find('id="external-data-verification"', start)
+        section = document[start:end]
+        self.assertIn('class="ai-only-summary"', section)
+        self.assertIn("AI 独立检出", section)
+        self.assertIn('class="ai-only-total"><strong>1</strong><span>项</span>', section)
+        self.assertIn('class="ai-only-severity sev-high"><span>高</span><strong>1</strong>', section)
+        self.assertIn('class="ai-only-severity sev-medium"><span>中</span><strong>0</strong>', section)
+        self.assertIn('class="ai-only-severity sev-low"><span>低</span><strong>0</strong>', section)
+
+        first_issue_start = section.find('class="issue-card')
+        second_issue_start = section.find('class="issue-card', first_issue_start + 1)
+        first_issue = section[first_issue_start:second_issue_start]
+        second_issue = section[second_issue_start:]
+        self.assertIn('class="ai-only-badge"', first_issue)
+        self.assertIn("AI 独立发现", first_issue)
+        self.assertIn("未与人工复核意见重叠，请优先核验其准确性", first_issue)
+        self.assertNotIn('class="ai-only-badge"', second_issue)
+
+    def test_ai_only_markers_are_hidden_until_review_is_performed(self):
+        result = load_sample()
+        result["reviewComparison"]["status"] = "not_performed"
+        result["reviewComparison"]["bands"] = {"overlap": 0, "aiOnly": 0, "divergent": 0, "reviewerOnly": 0}
+        result["reviewComparison"]["reviewerOnlyItems"] = []
+        for issue in result["issues"]:
+            issue["reviewComparison"] = {"status": "not_performed"}
+        document = delivery.render(result)
+        self.assertNotIn('class="ai-only-summary"', document)
+        self.assertNotIn('class="ai-only-badge"', document)
+
     def test_embedded_json_matches_digests(self):
         match = re.search(
             r'<script id="audit-result" type="application/json">(.*?)</script>', self.document, re.S

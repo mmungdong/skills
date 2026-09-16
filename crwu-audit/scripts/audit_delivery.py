@@ -24,7 +24,7 @@ import re
 import sys
 from pathlib import Path
 
-RENDERER_VERSION = "renderer/1.2.1"
+RENDERER_VERSION = "renderer/1.2.2"
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "template" / "audit-report.html"
 SCHEMA_VERSION_PREFIX = "1."
 
@@ -1284,10 +1284,46 @@ def _rule_map(rules) -> str:
     return "".join(parts)
 
 
+def _is_ai_only_issue(issue) -> bool:
+    comparison = issue.get("reviewComparison") or {}
+    return comparison.get("status") == "performed" and comparison.get("category") == "B"
+
+
+def _ai_only_summary(issues, comparison) -> str:
+    if comparison.get("status") != "performed":
+        return ""
+    ai_only = [issue for issue in issues if _is_ai_only_issue(issue)]
+    severity_counts = {"high": 0, "medium": 0, "low": 0}
+    for issue in ai_only:
+        severity = issue.get("severity")
+        if severity in severity_counts:
+            severity_counts[severity] += 1
+    parts = ['<aside class="ai-only-summary" aria-label="AI 独立检出统计">']
+    parts.append('<div class="ai-only-summary-head"><span>{0}</span>'.format(_text("AI 独立检出")))
+    parts.append('<span class="ai-only-total"><strong>{0}</strong><span>{1}</span></span></div>'.format(
+        _text(len(ai_only)), _text("项")))
+    parts.append('<div class="ai-only-severity-list">')
+    for severity in ("high", "medium", "low"):
+        parts.append('<span class="ai-only-severity {0}"><span>{1}</span><strong>{2}</strong></span>'.format(
+            SEVERITY_CLASS[severity], _text(SEVERITY_LABEL[severity]), _text(severity_counts[severity])))
+    parts.append("</div></aside>")
+    return "".join(parts)
+
+
 def _issue_card(issue) -> str:
-    cards = ['<article class="issue-card {0}">'.format(SEVERITY_CLASS.get(issue.get("severity"), ""))]
+    ai_only = _is_ai_only_issue(issue)
+    card_classes = ["issue-card", SEVERITY_CLASS.get(issue.get("severity"), "")]
+    if ai_only:
+        card_classes.append("ai-only-issue")
+    cards = ['<article class="{0}">'.format(" ".join(filter(None, card_classes)))]
     cards.append('<header class="issue-head">')
-    cards.append("<h3>{0}</h3>".format(_span("issue-title", issue.get("title"))))
+    cards.append('<div class="issue-title-row"><h3>{0}</h3>'.format(_span("issue-title", issue.get("title"))))
+    if ai_only:
+        cards.append('<span class="ai-only-badge">{0}</span>'.format(_text("AI 独立发现")))
+    cards.append("</div>")
+    if ai_only:
+        cards.append('<p class="ai-only-note">{0}</p>'.format(
+            _text("未与人工复核意见重叠，请优先核验其准确性")))
     cards.append('<div class="issue-meta">')
     cards.append('<span class="meta-chip issue-id">{0}</span>'.format(_text(issue.get("issueId"))))
     cards.append('<span class="meta-chip module-label">{0}：{1}</span>'.format(
@@ -2116,6 +2152,7 @@ def render(result: dict, print_trail: bool = None) -> str:
     # 03 需要处理的问题
     parts.append('<section id="actionable-issues">')
     parts.append("<h2>{0}</h2>".format(_text("AI 检出的问题项")))
+    parts.append(_ai_only_summary(sorted_issues, comparison))
     if sorted_issues:
         for issue in sorted_issues:
             parts.append(_issue_card(issue))

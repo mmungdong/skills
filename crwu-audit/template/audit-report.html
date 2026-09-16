@@ -161,6 +161,32 @@
     .issue-card.sev-high { border-left-color: var(--high); }
     .issue-card.sev-medium { border-left-color: var(--medium); }
     .issue-card.sev-low { border-left-color: var(--low); }
+    .issue-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 9px 12px; }
+    .issue-title-row h3 { flex: 1 1 320px; margin-bottom: 0; }
+    .ai-only-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 3px 10px;
+      color: #075985;
+      background: #e9f7fb;
+      border: 1px solid #9fd3e3;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+    .ai-only-note { margin: 9px 0 6px; padding: 8px 11px; color: #28576d; background: #f0f9fc; border-left: 3px solid #2290ad; border-radius: 5px; font-size: 13px; }
+    .ai-only-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 14px 16px; margin: 0 0 18px; background: #f0f9fc; border: 1px solid #b8deea; border-radius: 10px; }
+    .ai-only-summary-head { display: flex; align-items: baseline; gap: 10px; color: #174b72; font-weight: 800; }
+    .ai-only-total { display: inline-flex; align-items: baseline; gap: 3px; color: #075985; }
+    .ai-only-total strong { font-size: 25px; line-height: 1; font-variant-numeric: tabular-nums; }
+    .ai-only-severity-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .ai-only-severity { display: inline-flex; align-items: center; gap: 7px; min-width: 62px; padding: 5px 9px; background: #fff; border: 1px solid var(--line); border-radius: 7px; }
+    .ai-only-severity strong { font-variant-numeric: tabular-nums; }
+    .ai-only-severity.sev-high { color: var(--high); border-color: #edbfbc; }
+    .ai-only-severity.sev-medium { color: #955307; border-color: #efd2aa; }
+    .ai-only-severity.sev-low { color: var(--low); border-color: #b9d9e6; }
     .issue-meta { display: flex; flex-wrap: wrap; gap: 7px; margin: 8px 0 10px; }
     .issue-meta span, .stage li span { margin-right: 10px; }
     .issue-meta .severity-label {
