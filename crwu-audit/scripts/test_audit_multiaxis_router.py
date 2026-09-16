@@ -53,12 +53,12 @@ REGISTRY_HEADER = ("axis", "label", "skill", "status", "load behavior")
 EXPECTED_REGISTRY_ROWS = (
     ("asset", "房地产", "crwu-audit-asset-realestate", "available", "load"),
     ("asset", "机器设备", "crwu-audit-asset-equipment", "available", "load"),
-    ("public", "通用准则", "crwu-audit-public-general-standards", "available", "load always"),
+    ("public", "通用准则", "crwu-dev-audit-public-general-standards", "available", "load always"),
 )
 
 # Public-axis capabilities are report-shape independent. Every one of them must be
 # reachable from the union algorithm without depending on any professional axis label.
-UNCONDITIONAL_PUBLIC_SKILLS = ("crwu-audit-public-general-standards",)
+UNCONDITIONAL_PUBLIC_SKILLS = ("crwu-dev-audit-public-general-standards",)
 
 # 能力型公共轴技能：有各自的触发条件，不得被写成恒装配。
 CONDITIONAL_PUBLIC_SKILLS = ("crwu-audit-datacheck", "crwu-audit-external-data")
@@ -115,9 +115,9 @@ _REQUIRED_SIBLINGS = (
     "crwu-audit",
     "crwu-audit-asset-realestate",
     "crwu-audit-biz-asset-operation",
-    "crwu-audit-public-general-standards",
+    "crwu-dev-audit-public-general-standards",
     "crwu-audit-datacheck",
-    "crwu-audit-optimize",
+    "crwu-dev-audit-optimize",
     "crwu-audit-skill-maintainer",
     "crwu-dws",
 )
@@ -272,11 +272,11 @@ class AuditMultiaxisRouterContractTest(unittest.TestCase):
             and child.name
             not in {
                 "crwu-audit",
-                "crwu-audit-optimize",
+                "crwu-dev-audit-optimize",
                 "crwu-audit-skill-maintainer",
                 "crwu-audit-datacheck",
                 "crwu-audit-external-data",
-                "crwu-audit-public-general-standards",
+                "crwu-dev-audit-public-general-standards",
             }
         )
 
@@ -313,14 +313,14 @@ class AuditMultiaxisRouterContractTest(unittest.TestCase):
             )
         self.assertNotIn(
             "else []",
-            expression.split("crwu-audit-public-general-standards", 1)[0],
+            expression.split("crwu-dev-audit-public-general-standards", 1)[0],
             "unconditional public skills must be declared before any conditional branch",
         )
 
         # The router step that builds public_skills must state the unconditional rule too,
         # otherwise the algorithm and the runnable step can drift apart.
         self.assertIn(
-            "crwu-audit-public-general-standards",
+            "crwu-dev-audit-public-general-standards",
             router_text,
             "router SKILL.md must name the unconditional public skill in its public-capability step",
         )
@@ -370,7 +370,7 @@ class AuditMultiaxisRouterContractTest(unittest.TestCase):
         self.assertIn("crwu-audit-external-data", body, "public_skills must include the external-data capability")
         self.assertNotIn(
             "crwu-audit-external-data] when methods",
-            body.split("crwu-audit-public-general-standards", 1)[0],
+            body.split("crwu-dev-audit-public-general-standards", 1)[0],
             "conditional public skills must be declared after the unconditional one",
         )
 

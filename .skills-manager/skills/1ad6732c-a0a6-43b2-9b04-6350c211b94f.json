@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "1ad6732c-a0a6-43b2-9b04-6350c211b94f",
+  "path": "crwu-audit-biz-investment-capital",
+  "path_key": "crwu-audit-biz-investment-capital",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-biz-investment-capital",
+    "branch": null
+  }
+}

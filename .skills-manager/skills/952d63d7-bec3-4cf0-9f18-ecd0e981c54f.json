@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "952d63d7-bec3-4cf0-9f18-ecd0e981c54f",
+  "path": "crwu-audit-asset-mining-right",
+  "path_key": "crwu-audit-asset-mining-right",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-asset-mining-right",
+    "branch": null
+  }
+}

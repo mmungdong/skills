@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://crwu.local/schema/audit-result/1.0.0",
   "title": "AuditResult",
-  "description": "CRWU 审核意见送达规范 v1.0 §9 统一 AuditResult JSON 数据结构（机器可校验 Schema；语义重算规则见同目录 audit_delivery.py 与规范 §9.4）。",
+  "description": "CRWU 审核意见送达规范 v1.1 §9 统一 AuditResult JSON 数据结构（机器可校验 Schema；语义重算规则见同目录 audit_delivery.py 与规范 §9.4）。",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -334,6 +334,7 @@
                   ]
                 },
                 "locator": {
+                  "description": "证据定位。材料侧：`<文件名>!<sheet>!<单元格或区域>`。非单元格证据（图片/页眉页脚/批注/形状/图表）另用受控写法：`<sheet>!图片#<序号>（锚点 <起始行>:<结束行>）`、`<sheet>!页眉`、`<sheet>!页脚`、`<sheet>!批注!<单元格>`、`<sheet>!图形#<序号>`、扫描件 `<文件名>#第<N>页`。该形态只能来自 raw 原件直读（工作版不含这些部件）；未核验的写「未核验」，严禁写「缺失/为空/未列示」。口径见 00-input-and-route-profile.md §Excel 与 11-html-delivery-spec.md §4.3。",
                   "type": "string",
                   "minLength": 1
                 },
@@ -399,6 +400,7 @@
                   "minLength": 1
                 },
                 "locator": {
+                  "description": "证据定位。材料侧：`<文件名>!<sheet>!<单元格或区域>`。非单元格证据（图片/页眉页脚/批注/形状/图表）另用受控写法：`<sheet>!图片#<序号>（锚点 <起始行>:<结束行>）`、`<sheet>!页眉`、`<sheet>!页脚`、`<sheet>!批注!<单元格>`、`<sheet>!图形#<序号>`、扫描件 `<文件名>#第<N>页`。该形态只能来自 raw 原件直读（工作版不含这些部件）；未核验的写「未核验」，严禁写「缺失/为空/未列示」。口径见 00-input-and-route-profile.md §Excel 与 11-html-delivery-spec.md §4.3。",
                   "type": "string",
                   "minLength": 1
                 },
@@ -721,6 +723,161 @@
             }
           }
         },
+        "reviewFiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "order",
+              "level",
+              "displayName",
+              "version"
+            ],
+            "properties": {
+              "order": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "level": {
+                "type": "string",
+                "minLength": 1
+              },
+              "displayName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "reviewItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "itemId",
+              "title",
+              "module",
+              "reviewLevel",
+              "matchStatus",
+              "linkedIssueIds",
+              "reviewerEvidence",
+              "inFileResolution",
+              "handling"
+            ],
+            "properties": {
+              "itemId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "module": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reviewLevel": {
+                "type": "string",
+                "minLength": 1
+              },
+              "matchStatus": {
+                "enum": [
+                  "exact",
+                  "partial",
+                  "miss"
+                ]
+              },
+              "linkedIssueIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "reviewerEvidence": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "locator",
+                  "quote"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "locator": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quote": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "inFileResolution": {
+                "enum": [
+                  "L-resolved",
+                  "L-open",
+                  "L-unclosed",
+                  "L-uncheckable"
+                ]
+              },
+              "inFileEvidence": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "locator"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "locator": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quote": {
+                    "type": "string"
+                  }
+                }
+              },
+              "closureEvidence": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "locator",
+                  "quote"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "locator": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quote": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "handling": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
         "bands": {
           "type": "object",
           "required": [
@@ -781,6 +938,7 @@
                     "minLength": 1
                   },
                   "locator": {
+                    "description": "证据定位。材料侧：`<文件名>!<sheet>!<单元格或区域>`。非单元格证据（图片/页眉页脚/批注/形状/图表）另用受控写法：`<sheet>!图片#<序号>（锚点 <起始行>:<结束行>）`、`<sheet>!页眉`、`<sheet>!页脚`、`<sheet>!批注!<单元格>`、`<sheet>!图形#<序号>`、扫描件 `<文件名>#第<N>页`。该形态只能来自 raw 原件直读（工作版不含这些部件）；未核验的写「未核验」，严禁写「缺失/为空/未列示」。口径见 00-input-and-route-profile.md §Excel 与 11-html-delivery-spec.md §4.3。",
                     "type": "string",
                     "minLength": 1
                   },
@@ -810,6 +968,7 @@
                     "minLength": 1
                   },
                   "locator": {
+                    "description": "证据定位。材料侧：`<文件名>!<sheet>!<单元格或区域>`。非单元格证据（图片/页眉页脚/批注/形状/图表）另用受控写法：`<sheet>!图片#<序号>（锚点 <起始行>:<结束行>）`、`<sheet>!页眉`、`<sheet>!页脚`、`<sheet>!批注!<单元格>`、`<sheet>!图形#<序号>`、扫描件 `<文件名>#第<N>页`。该形态只能来自 raw 原件直读（工作版不含这些部件）；未核验的写「未核验」，严禁写「缺失/为空/未列示」。口径见 00-input-and-route-profile.md §Excel 与 11-html-delivery-spec.md §4.3。",
                     "type": "string",
                     "minLength": 1
                   },
@@ -830,6 +989,7 @@
                     "minLength": 1
                   },
                   "locator": {
+                    "description": "证据定位。材料侧：`<文件名>!<sheet>!<单元格或区域>`。非单元格证据（图片/页眉页脚/批注/形状/图表）另用受控写法：`<sheet>!图片#<序号>（锚点 <起始行>:<结束行>）`、`<sheet>!页眉`、`<sheet>!页脚`、`<sheet>!批注!<单元格>`、`<sheet>!图形#<序号>`、扫描件 `<文件名>#第<N>页`。该形态只能来自 raw 原件直读（工作版不含这些部件）；未核验的写「未核验」，严禁写「缺失/为空/未列示」。口径见 00-input-and-route-profile.md §Excel 与 11-html-delivery-spec.md §4.3。",
                     "type": "string",
                     "minLength": 1
                   },
@@ -847,10 +1007,51 @@
         },
         "metrics": {
           "type": "object",
-          "required": [
-            "denominator"
-          ],
           "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "resolved": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "uncheckable": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "evaluable": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "exactHits": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "partialHits": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "misses": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "strictHitRate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 100
+            },
+            "coverageRate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 100
+            },
             "aiHitRate": {
               "type": "string"
             },
@@ -967,6 +1168,7 @@
                     "type": "string"
                   },
                   "locator": {
+                    "description": "证据定位。材料侧：`<文件名>!<sheet>!<单元格或区域>`。非单元格证据（图片/页眉页脚/批注/形状/图表）另用受控写法：`<sheet>!图片#<序号>（锚点 <起始行>:<结束行>）`、`<sheet>!页眉`、`<sheet>!页脚`、`<sheet>!批注!<单元格>`、`<sheet>!图形#<序号>`、扫描件 `<文件名>#第<N>页`。该形态只能来自 raw 原件直读（工作版不含这些部件）；未核验的写「未核验」，严禁写「缺失/为空/未列示」。口径见 00-input-and-route-profile.md §Excel 与 11-html-delivery-spec.md §4.3。",
                     "type": "string"
                   }
                 }

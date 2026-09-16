@@ -8,18 +8,20 @@
     :root {
       --ink: #172033;
       --muted: #667085;
-      --brand: #244a75;
-      --brand-soft: #edf4fb;
+      --brand: #174b72;
+      --brand-strong: #0f3554;
+      --brand-soft: #eaf4fa;
+      --accent: #16a085;
       --surface: #ffffff;
       --surface-subtle: #f7f9fc;
       --line: #d8dee9;
       --line-strong: #b7c1cf;
-      --high: #a92d28;
-      --high-soft: #fff2f0;
-      --medium: #9a5b08;
-      --medium-soft: #fff8e8;
-      --low: #60630b;
-      --low-soft: #f8f9e9;
+      --high: #c2413b;
+      --high-soft: #fff7f6;
+      --medium: #b86b12;
+      --medium-soft: #fff8ed;
+      --low: #287596;
+      --low-soft: #f1f8fb;
       --shadow: 0 10px 30px rgba(23, 32, 51, 0.07);
       --radius: 10px;
     }
@@ -29,7 +31,7 @@
     body {
       margin: 0;
       color: var(--ink);
-      background: #eef2f7;
+      background: radial-gradient(circle at 85% 5%, #dfeef6 0, #eef3f7 35%, #e8edf2 100%);
       font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, "Segoe UI", sans-serif;
       font-size: 15px;
       line-height: 1.65;
@@ -54,7 +56,7 @@
     .skip-link:focus { top: 12px; }
     .report-shell {
       display: grid;
-      grid-template-columns: 232px minmax(0, 980px);
+      grid-template-columns: 224px minmax(0, 1080px);
       gap: 28px;
       align-items: start;
       justify-content: center;
@@ -110,9 +112,9 @@
       border-radius: 12px;
       box-shadow: var(--shadow);
     }
-    main { max-width: 980px; margin: 0 auto; padding: 42px 46px 56px; }
+    main { max-width: 1080px; margin: 0 auto; padding: 34px 42px 56px; }
     header, main > section, main > details, footer { scroll-margin-top: 24px; }
-    h1 { margin: 0 0 8px; color: #142c48; font-size: 28px; line-height: 1.3; letter-spacing: 0.01em; }
+    h1 { margin: 0 0 8px; color: #fff; font-size: 30px; line-height: 1.3; letter-spacing: 0.01em; }
     h2 {
       margin: 38px 0 16px;
       padding: 0 0 9px;
@@ -123,7 +125,7 @@
     }
     h3 { margin: 0 0 8px; color: #203b59; font-size: 17px; }
     h4 { margin: 16px 0 8px; color: #526174; font-size: 13px; }
-    section { margin-bottom: 18px; }
+    section { margin-bottom: 22px; }
     p { margin: 8px 0; }
     table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 10px 0 16px; }
     th, td {
@@ -140,6 +142,10 @@
     thead th { color: #344054; background: #edf2f7; font-weight: 700; }
     table.kv th { width: 128px; color: #475467; background: var(--surface-subtle); }
     tbody tr:nth-child(even) td { background: #fbfcfe; }
+    .readable-status { display: inline-block; min-width: 1.5em; text-align: center; font-size: 17px; font-weight: 800; }
+    .readable-status.is-readable { color: #14804a; }
+    .readable-status.is-unreadable { color: #b42318; }
+    .table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
     ul { margin: 8px 0; padding-left: 20px; }
     li { margin: 5px 0; break-inside: avoid; }
     .issue-card {
@@ -148,14 +154,14 @@
       background: #fff;
       border: 1px solid var(--line);
       border-left: 5px solid var(--line-strong);
-      border-radius: 8px;
-      box-shadow: 0 4px 14px rgba(23, 32, 51, 0.05);
-      break-inside: avoid;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(23, 32, 51, 0.06);
+      break-inside: auto;
     }
-    .issue-card.sev-high { border-left-color: var(--high); background: linear-gradient(90deg, var(--high-soft), #fff 90px); }
-    .issue-card.sev-medium { border-left-color: var(--medium); background: linear-gradient(90deg, var(--medium-soft), #fff 90px); }
-    .issue-card.sev-low { border-left-color: var(--low); background: linear-gradient(90deg, var(--low-soft), #fff 90px); }
-    .issue-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 5px 0 12px; }
+    .issue-card.sev-high { border-left-color: var(--high); }
+    .issue-card.sev-medium { border-left-color: var(--medium); }
+    .issue-card.sev-low { border-left-color: var(--low); }
+    .issue-meta { display: flex; flex-wrap: wrap; gap: 7px; margin: 8px 0 10px; }
     .issue-meta span, .stage li span { margin-right: 10px; }
     .issue-meta .severity-label {
       padding: 1px 8px;
@@ -164,9 +170,18 @@
       font-size: 12px;
       font-weight: 700;
     }
-    .sev-high .severity-label { color: var(--high); border-color: var(--high); }
-    .sev-medium .severity-label { color: var(--medium); border-color: var(--medium); }
-    .sev-low .severity-label { color: var(--low); border-color: var(--low); }
+    .meta-chip { padding: 3px 9px; background: #f5f7fa; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; }
+    .issue-location { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+    .issue-review-status { padding: 9px 12px; color: var(--brand-strong); background: var(--brand-soft); border-radius: 7px; }
+    .action-panel { padding: 10px 13px; background: #f4faf8; border: 1px solid #c9e7df; border-radius: 8px; }
+    .issue-edits { margin: 12px 0; border-color: #badbd3; background: #f4faf8; }
+    .issue-edits > summary { color: #176653; }
+    .issue-edits > summary::after { color: #176653; border-color: #9fcfc3; }
+    .issue-edits .action-panel { padding: 4px 0 0; margin: 0; border: 0; background: transparent; }
+    .issue-edits .action-panel h4 { margin-top: 8px; }
+    .sev-high .severity-label { color: var(--high); background: var(--high-soft); border-color: #edbfbc; }
+    .sev-medium .severity-label { color: #955307; background: var(--medium-soft); border-color: #efd2aa; }
+    .sev-low .severity-label { color: var(--low); background: var(--low-soft); border-color: #b9d9e6; }
     .issue-id, .rule-id, .file, .locator, .kb-path, .exported-at, .role { color: var(--muted); }
     .quote, .excerpt { font-style: italic; }
     .problem-label { margin-right: 6px; color: #344054; font-weight: 700; }
@@ -189,7 +204,39 @@
       border-radius: 8px;
       background: var(--surface-subtle);
     }
-    summary { min-height: 32px; cursor: pointer; color: #264b73; font-weight: 700; }
+    summary { min-height: 40px; cursor: pointer; color: #174b72; font-weight: 700; list-style: none; display: flex; align-items: center; gap: 8px; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "展开 ↓"; margin-left: auto; padding: 4px 9px; color: var(--brand); background: #fff; border: 1px solid #aac7da; border-radius: 999px; font-size: 12px; }
+    details[open] > summary::after { content: "收起 ↑"; }
+    #project-info { margin: -34px -42px 0; padding: 34px 42px 28px; color: #eaf3f8; background: linear-gradient(135deg, var(--brand-strong), var(--brand) 60%, #247b87); border-radius: 12px 12px 0 0; }
+    #project-info .badge { margin-bottom: 0; color: #eff8fc; background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25); }
+    .project-line { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 8px 0 12px; }
+    .project-line span { color: #d9eaf3; }
+    .project-details { margin: 12px 0 0; color: var(--ink); background: rgba(255,255,255,.96); }
+    #summary { padding: 22px; margin: 0 -2px 24px; background: #f7fbfd; border: 1px solid #d6e5ee; border-radius: 0 0 12px 12px; }
+    #summary h2 { margin-top: 0; }
+    .summary-kpis, .review-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+    .metric-card { min-width: 0; padding: 13px 14px; background: #fff; border: 1px solid var(--line); border-top: 3px solid #aab5c2; border-radius: 10px; }
+    .metric-card span { display: block; color: var(--muted); font-size: 12px; }
+    .metric-card strong { display: block; margin-top: 3px; color: var(--ink); font-size: 23px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+    .metric-card.primary { border-top-color: var(--brand); }
+    .metric-card.good { border-top-color: var(--accent); }
+    .metric-card.warning { border-top-color: var(--medium); }
+    .metric-card.danger { border-top-color: var(--high); }
+    .formula { padding: 10px 12px; color: #445468; background: #f3f6f9; border-left: 3px solid #8aa6bc; border-radius: 6px; font-size: 13px; }
+    .closure-alert { padding: 13px 14px; color: #8a231f; background: var(--high-soft); border: 1px solid #e1aaa7; border-radius: 8px; }
+    .review-file-list { padding: 0; list-style: none; counter-reset: none; }
+    .review-file-list li { display: grid; grid-template-columns: 32px minmax(0,1fr) auto auto; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+    .review-file-list .order { display: grid; place-items: center; width: 26px; height: 26px; color: #fff; background: var(--brand); border-radius: 50%; }
+    .review-level { padding: 14px; background: #fbfcfe; border: 1px solid var(--line); border-radius: 10px; }
+    .level-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+    .level-summary span { padding: 5px 9px; background: #fff; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+    .review-item { margin: 14px 0; padding: 12px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+    .review-item-unclosed { border-left: 4px solid var(--high); background: var(--high-soft); }
+    .score-hero { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-bottom: 12px; }
+    .score-hero div { padding: 18px; color: #fff; background: linear-gradient(135deg, var(--brand-strong), var(--brand)); border-radius: 10px; }
+    .score-hero span, .score-hero strong { display: block; }
+    .score-hero strong { margin-top: 4px; font-size: 30px; }
     .footer-meta { color: var(--muted); font-size: 12px; }
     .badge {
       display: inline-block;
@@ -218,6 +265,8 @@
       .report-catalog a { min-height: 44px; padding-inline: 10px; }
       .report-page { border: 0; border-radius: 0; box-shadow: none; }
       main { padding: 28px 22px 44px; }
+      #project-info { margin: -28px -22px 0; padding: 28px 22px 24px; border-radius: 0; }
+      .summary-kpis, .review-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     @media (max-width: 600px) {
@@ -228,6 +277,9 @@
       th, td { padding: 8px; font-size: 12px; }
       table.kv th { width: 104px; }
       .issue-card { padding: 14px; }
+      .summary-kpis, .review-kpis, .score-hero { grid-template-columns: 1fr; }
+      .review-file-list li { grid-template-columns: 30px minmax(0, 1fr); }
+      .review-file-list li span:last-child, .review-file-list li span:nth-last-child(2) { grid-column: 2; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -245,10 +297,14 @@
       details { border: none; padding: 0; background: #fff; }
       details > summary { display: none; }
       details:not([open]) > *:not(summary) { display: block; }
-      .issue-card { box-shadow: none; break-inside: avoid; }
+      .issue-edits .action-panel { padding: 0; }
+      .issue-card { box-shadow: none; break-inside: auto; }
       .issue-card.sev-high, .issue-card.sev-medium, .issue-card.sev-low { background: #fff; }
       thead { display: table-header-group; }
       th, td { border-color: #777; }
+      .table-scroll { overflow: visible; }
+      .summary-kpis, .review-kpis { grid-template-columns: repeat(5, 1fr); }
+      .metric-card { padding: 7px; }
       a[href]:after { content: ""; }
     }
   </style>
@@ -259,14 +315,14 @@
     <nav class="report-catalog" aria-label="报告目录">
       <p class="catalog-title">报告目录</p>
       <ol>
-        <li><a href="#project-info">项目信息</a></li>
-        <li><a href="#summary">审核结果概览</a></li>
-        <li><a href="#actionable-issues">需要处理的问题</a></li>
+        <li><a href="#project-info">AI 审核总结</a></li>
+        <li><a href="#summary">审核结论概览</a></li>
+        <li><a href="#actionable-issues">AI 检出问题</a></li>
+        <li><a href="#external-data-verification">AI 外部核验</a></li>
+        <li><a href="#review-comparison">人工复核对照</a></li>
+        <li><a href="#ai-scorecard">AI 表现评分卡</a></li>
         <li><a href="#manual-confirmation-items">人工确认事项</a></li>
         <li><a href="#audit-basis">本次审核依据</a></li>
-        <li><a href="#external-data-verification">外部数据核验</a></li>
-        <li><a href="#review-comparison">人工复核对照</a></li>
-        <li><a href="#ai-scorecard">AI 审核评分卡</a></li>
         <li><a href="#scope-and-not-checked">范围与未检查项</a></li>
         <li><a href="#professional-trail">专业审核轨迹</a></li>
         <li><a href="#file-trace">文件追溯信息</a></li>

@@ -13,7 +13,7 @@
    - `KB/…` 省略号（不可解析引用）；
    - 已废止的本地根相对引用 `KB/<rel>`；
    - 已废止的本地知识库根常量与本地根路径字面（`~/.crwu/...`，目录缓存除外）。
-2. 实时引用协议 lint（`--skill-root`，作用于 `crwu-audit*` 族目录）
+2. 实时引用协议 lint（`--skill-root`，作用于 `crwu-audit*` 与 `crwu-dev-audit-*` 族目录）
    - 禁止本地知识库根字面、禁止硬编码 nodeId 赋值；
    - `--forbid-literal` 追加禁止知识库名称等字面。
    纪律文本（含"禁止/不写…字面"的说明行）自动豁免。
@@ -127,8 +127,11 @@ def skill_path_problems(skill_root: str):
 
 # ---------------- 实时引用协议 lint（2026-09-08，crwu-dws × crwu-audit 实时引用改造） ----------------
 
-# 只对 crwu-audit* 族目录做"三不写"严格 lint（crwu-dws 等允许按需引用部署常量/默认库名）
-AUDIT_DIR_PREFIXES = ("crwu-audit",)
+# 只对审核族目录做"三不写"严格 lint（crwu-dws 等允许按需引用部署常量/默认库名）。
+# 两组前缀都要覆盖：`crwu-audit*`（审核族）与 `crwu-dev-audit-*`（开发/维护侧成员，
+# 如 crwu-dev-audit-optimize、crwu-dev-audit-public-general-standards）——只认前者会让
+# 改到 dev 前缀的技能**静默掉出 lint 范围**（2026-09-16 改名时同步修正）。
+AUDIT_DIR_PREFIXES = ("crwu-audit", "crwu-dev-audit")
 # ① 本地知识库根常量赋值 / 根路径字面 / 内容副本目录字面（推理引用实时化后一律禁止写死在技能内）
 _LIVE_NO_ROOT_RES = [
     re.compile(r"CRWU_KB_ROOT\s*="),
@@ -300,7 +303,7 @@ def main():
     p_v = sub.add_parser("validate", help="技能引用卫生（旧树标记/省略号/废止的本地根引用）与实时协议 lint")
     p_v.add_argument("--skill-root", action="append", help="扫描的技能目录（如 crwu-ai/skills），可多次")
     p_v.add_argument("--forbid-literal", action="append", default=[], metavar="字面",
-                     help="实时协议 lint：禁止出现的知识库名称等字面（可多次；根路径/nodeId 检查默认只对 crwu-audit* 目录生效）")
+                     help="实时协议 lint：禁止出现的知识库名称等字面（可多次；根路径/nodeId 检查默认只对 crwu-audit*/crwu-dev-audit-* 目录生效）")
     p_v.set_defaults(fn=cmd_validate)
 
     args = ap.parse_args()

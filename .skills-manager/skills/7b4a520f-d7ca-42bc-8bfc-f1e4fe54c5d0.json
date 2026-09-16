@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "7b4a520f-d7ca-42bc-8bfc-f1e4fe54c5d0",
+  "path": "crwu-h3yun-query",
+  "path_key": "crwu-h3yun-query",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-h3yun-query",
+    "branch": null
+  }
+}

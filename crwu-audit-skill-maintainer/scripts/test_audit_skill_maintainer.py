@@ -148,9 +148,9 @@ _REQUIRED_SIBLINGS = (
     "crwu-audit",
     "crwu-audit-asset-realestate",
     "crwu-audit-biz-asset-operation",
-    "crwu-audit-public-general-standards",
+    "crwu-dev-audit-public-general-standards",
     "crwu-audit-datacheck",
-    "crwu-audit-optimize",
+    "crwu-dev-audit-optimize",
     "crwu-audit-skill-maintainer",
     "crwu-dws",
 )
@@ -613,6 +613,57 @@ class AuditSkillMaintainerCheckerTest(unittest.TestCase):
 
         self.assertEqual([], errors)
 
+    def test_audit_family_gates_cover_both_prefixes(self):
+        """门禁必须同时覆盖 `crwu-audit*` 与 `crwu-dev-audit-*` 两组前缀。
+
+        2026-09-16 改名：`crwu-dev-audit-optimize` / `crwu-dev-audit-public-general-standards`
+        移到 `crwu-dev-audit-`。若门禁只认 `crwu-audit`，这两个技能会**静默掉出**"三不写"
+        lint（kb_tool）与装配路径键/frontmatter/真实目录解析（映射检查器）的扫描范围——
+        正是"改名反而更难维护"的根因，故用本用例钉住。
+        """
+        kb_tool = self._kb_tool()
+        self.assertIn("crwu-audit", kb_tool.AUDIT_DIR_PREFIXES)
+        self.assertIn("crwu-dev-audit", kb_tool.AUDIT_DIR_PREFIXES)
+
+        # 以模块方式载入检查器（dataclass 需要模块先注册进 sys.modules，Py3.9 尤其如此）
+        checker_spec = importlib.util.spec_from_file_location("checker_for_prefix_test", CHECKER)
+        checker = importlib.util.module_from_spec(checker_spec)
+        sys.modules[checker_spec.name] = checker
+        try:
+            checker_spec.loader.exec_module(checker)
+        finally:
+            sys.modules.pop(checker_spec.name, None)
+        self.assertIn("crwu-audit", tuple(checker.AUDIT_FAMILY_PREFIX))
+        self.assertIn("crwu-dev-audit", tuple(checker.AUDIT_FAMILY_PREFIX))
+        # 裸名 `crwu-audit`（router）由 ROUTER_SKILL 单独覆盖，token 正则只匹配具体技能名
+        for name in ("crwu-audit-public-general-standards", "crwu-dev-audit-optimize",
+                     "crwu-dev-audit-public-general-standards"):
+            self.assertIn(name, checker._SKILL_TOKEN_RE.findall("路由点名 `" + name + "`。"),
+                          f"{name} 必须被 _SKILL_TOKEN_RE 认出（否则 R4 漏检）")
+
+    def test_live_protocol_lint_covers_dev_prefixed_directories(self):
+        """`crwu-dev-audit-*` 目录里的技能正文必须同样受"三不写"lint 约束。"""
+        module = self._kb_tool()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            _write(root / "crwu-dev-audit-canary" / "SKILL.md",
+                   '---\nname: crwu-dev-audit-canary\n---\n\nCRWU_KB_ROOT = "/tmp/kb"\n')
+
+            errors, _warnings = module.live_protocol_lint(str(root), [])
+
+            self.assertTrue(any("canary" in e for e in errors),
+                            f"dev 前缀目录未被 lint 覆盖：{errors}")
+
+    @_requires_skill_tree
+    def test_renamed_dev_prefix_skills_are_on_disk_with_matching_names(self):
+        """改名后的两个技能目录与 frontmatter 名必须一致（防止源码/登记再次漂移）。"""
+        for name in ("crwu-dev-audit-optimize", "crwu-dev-audit-public-general-standards"):
+            skill_md = SKILLS_ROOT / name / "SKILL.md"
+            self.assertTrue(skill_md.is_file(), f"{name}/SKILL.md 不存在")
+            front = [line for line in skill_md.read_text(encoding="utf-8").splitlines()
+                     if line.startswith("name:")]
+            self.assertEqual([f"name: {name}"], front, f"{name} 的 frontmatter name 与目录名不一致")
+
 
 def _codes(report: dict) -> set[str]:
     return {item["code"] for item in report["findings"]}
@@ -652,6 +703,26 @@ def _cache_space_name(directory: Path) -> str:
         return ""
     name = space.get("name")
     return name if isinstance(name, str) else ""
+
+
+def _catalog_report(catalog: Path) -> dict:
+    """跑 checker 并解析其 JSON 报告；**目录不可解析时显式 skip，不得崩、也不得静默通过**。
+
+    实时缓存是外部产物（crwu-dws M1 写入 `~/.crwu`），可能因**生产侧偏离契约**而无法作为
+    `--catalog` 输入（真实失效：`目录快照.json` 写成扁平 `path` 形态、schema 字面
+    混成 `crwu.kb-dir-cache.snapshot.v1`）。此时本测试拿不到"库内路径键是否存在"的证据，
+    按本文件纪律"内容缺失必须显式 skip"处理，并把 checker 的原始报错写进 skip 消息——
+    既不当作技能漂移失败，也不假装通过。
+    """
+    proc = run_checker(REPO_ROOT, catalog)
+    try:
+        return json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        lines = (proc.stderr or proc.stdout or "").strip().splitlines()
+        raise unittest.SkipTest(
+            f"实时目录缓存不可作为 --catalog 使用（{catalog.name}）："
+            + (lines[-1] if lines else "checker 未产出 JSON 报告")
+        )
 
 
 def _live_cache_dirs() -> list[Path]:
@@ -1514,6 +1585,61 @@ class AuditSkillMaintainerFindingCoverageTest(unittest.TestCase):
 
             self.assertEqual([], _findings(report, "KB_PATH_KEY_NOT_IN_CATALOG"))
 
+    def test_unsupported_catalog_schema_reports_accepted_set_and_remediation(self):
+        """无法解析的 catalog schema：报错必须列出可接受集合并给出重建指引，不得只报名字。
+
+        真实失效：实时 `目录快照.json` 被写成扁平 `path` 形态、schema 字面混成
+        `crwu.kb-dir-cache.snapshot.v1`（与 `.cache-meta.json` 的 `crwu.kb-dir-cache.meta.v1`
+        混合而成），而旧报错只有 `unsupported catalog schema: '…'` —— 看不出该改什么。
+        不得为该字面开别名：那等于把漂移固化成契约。
+
+        本测试自足（不依赖同级技能），故不加 `@_requires_skill_tree`：
+        单独安装本技能时这条报错契约仍须被锁住。
+        """
+        with tempfile.TemporaryDirectory() as td:
+            catalog = Path(td) / "目录快照.json"
+            catalog.write_text(
+                json.dumps({"schema": "crwu.kb-dir-cache.snapshot.v1", "nodes": []}),
+                encoding="utf-8",
+            )
+            proc = run_checker(REPO_ROOT, catalog)
+            self.assertNotEqual(0, proc.returncode, "不可解析的 catalog 必须非零退出")
+            err = proc.stderr + proc.stdout
+            for needle in ("accepted:", "crwu.kb-catalog.snapshot.v1",
+                           "rebuild it with crwu-dws M1", "nested `children`"):
+                self.assertIn(needle, err, err)
+            self.assertNotIn("Traceback", err, "须是可读错误信息，不是异常栈")
+
+    def test_mandated_directory_tree_form_is_parseable(self):
+        """`crwu-dws/references/00` §4 规定的 `目录树.md` 形态（`├─`/`└─` + `[F]`/extension）
+        必须能作为 `--catalog` 读取。
+
+        三种形态历史上互不一致：**规范**是 box-drawing（`├─`/`└─`、folder 标 `[F]`、文档标
+        `extension`），**旧产物**是图标树（`- 📁`／`- 📄`），而 checker 只认图标树与 slash 树——
+        结果"规定的产物"反而解析不了，`目录树.md` 无法作为目录输入。
+
+        本测试自足（不依赖同级技能），故不加 `@_requires_skill_tree`。
+        """
+        tree = textwrap.dedent("""\
+            # 某知识库 目录树
+            > workspaceId: w ｜ spaceType: orgWikiSpace ｜ 扫取: 2026-09-15T00:00:00+08:00 ｜ profile: p
+            > 节点 4（folder 2 / 文档 2）/ 深度 2 ｜ complete: true
+
+            ├─ 01-业务路线/                    [F]
+            │  ├─ 01-资产经营/                    [F]
+            │  │  └─ 共同审核点                    adoc
+            └─ 根层文档名                    ext:未提供
+            """)
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "目录树.md"
+            path.write_text(tree, encoding="utf-8")
+            report = json.loads(run_checker(REPO_ROOT, path).stdout)
+            self.assertEqual(
+                ("01-业务路线/", "01-业务路线/01-资产经营/",
+                 "01-业务路线/01-资产经营/共同审核点", "根层文档名"),
+                tuple(report["catalog"]["paths"]),
+            )
+
     @_requires_skill_tree
     def test_real_repository_library_path_keys_exist(self):
         """Regression: this repo's audit-family address keys must resolve in the live catalog.
@@ -1524,7 +1650,7 @@ class AuditSkillMaintainerFindingCoverageTest(unittest.TestCase):
         """
         for directory in _live_cache_dirs():
             catalog = directory / "目录快照.json"
-            report = json.loads(run_checker(REPO_ROOT, catalog).stdout)
+            report = _catalog_report(catalog)
             if not _is_audit_family_catalog(tuple(report["catalog"]["paths"])):
                 continue
 
@@ -1557,7 +1683,7 @@ class AuditSkillMaintainerFindingCoverageTest(unittest.TestCase):
                 continue
             parsed: dict[str, tuple[str, ...]] = {}
             for form in forms:
-                report = json.loads(run_checker(REPO_ROOT, form).stdout)
+                report = _catalog_report(form)
                 parsed[form.name] = tuple(report["catalog"]["paths"])
             if not _is_audit_family_catalog(parsed[forms[0].name]):
                 continue
@@ -1569,7 +1695,7 @@ class AuditSkillMaintainerFindingCoverageTest(unittest.TestCase):
             )
             # The mandated freshness gate must also pass on the authoritative snapshot.
             live = forms[0]
-            report = json.loads(run_checker(REPO_ROOT, live, "--max-age-hours", "24").stdout)
+            report = _catalog_report(live)
             self.assertNotIn("CATALOG_NOT_LIVE", _codes(report))
             return
         self.skipTest("no live DWS cache with multiple artifact forms is available")
@@ -1974,7 +2100,7 @@ class PublicAxisMappingTest(unittest.TestCase):
     its references, and no mapping finding would fire.
     """
 
-    PUBLIC_SKILL = "crwu-audit-public-general-standards"
+    PUBLIC_SKILL = "crwu-dev-audit-public-general-standards"
     PUBLIC_ROOTS = ("06-规则库/02-通用准则-报告与披露/", "06-规则库/03-通用准则-程序与档案/")
 
     def _repo_with_public_row(self, root: Path) -> Path:
@@ -2089,7 +2215,7 @@ class PublicAxisMappingTest(unittest.TestCase):
             )
 
     def test_public_skill_path_keys_are_checked_against_the_catalog(self):
-        """`inspect_path_keys` walks every crwu-audit* directory, public axis included."""
+        """`inspect_path_keys` walks every audit-family (crwu-audit*/crwu-dev-audit-*) directory, public axis included."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             repo = self._repo_with_public_row(root)

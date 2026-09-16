@@ -1,6 +1,6 @@
 # CRWU 审核意见交付工具（AuditResult 校验 + 单文件 HTML 渲染）
 
-本目录实现《CRWU 审核意见 HTML 送达规范 v1.0》的**机器可校验 Schema**、**校验器**与**确定性 renderer**。
+本目录实现《CRWU 审核意见 HTML 送达规范 v1.1》的**机器可校验 Schema**、**校验器**与**确定性 renderer**。
 规范正文（唯一事实源）：本技能 `references/11-html-delivery-spec.md`。
 
 | 文件 | 作用 | 对应规范 |
@@ -32,6 +32,33 @@ python3 scripts/test_audit_delivery.py
 
 退出码：`0` 通过；`1` 校验失败（错误逐条打印到 stderr，且**拒绝渲染**）。
 
+## 材料准备与媒体证据通道（阶段一 / 阶段二复核件）
+
+| 文件 | 作用 | 对应口径 |
+| --- | --- | --- |
+| `prepare_materials.py` | 材料盘点 + 隐藏区隔离（工作版重建）+ 归档解压 + **媒体证据导出与放行清单** | `references/00-input-and-route-profile.md` §Excel 隐藏数据隔离 |
+| `media_extract.py` | 媒体抽取库：xlsx 绘图锚点 / docx·doc 正文图（段落序）/ PDF 内嵌图 / 独立图片；H0 与 fail-closed | 同上 §非单元格证据 |
+| `test_prepare_materials.py`、`test_media_extract.py` | 上述两脚本的契约测试 | — |
+
+```bash
+# 阶段一：盘点 + 工作版 + 媒体证据（产出 材料盘点.json / 媒体索引.json / 提取/ / 工作版/ / 媒体证据/）
+python3 scripts/prepare_materials.py --case <案例目录>
+
+# 阶段二：复核件（复核意见附件里的图同样要抽取；产物名加后缀，绝不覆盖阶段一冻结产物）
+python3 scripts/prepare_materials.py --case <案例目录> --src 复核-人工 --label 复核
+
+# 契约测试
+python3 scripts/test_prepare_materials.py
+python3 scripts/test_media_extract.py
+```
+
+- `媒体索引.json` 是**媒体放行清单**：逐条含 `mediaId`、`kind`、受控 `locator`、`localPath`（案例内相对路径）、
+  `sha256`、`evidenceChannel=host-vision`。叶子只按该清单消费（经宿主多模态读图），**不得自行解析 raw 原件包**。
+- **H0**：锚点落在隐藏 sheet / 隐藏行 / 隐藏列的媒体**不导出、不定位**，只记 `hiddenSkippedCount`；
+  锚点不可判定或隐藏结构不可得时 fail-closed 不导出，并记 `unresolvedReasons[]` —— **未核 ≠ 缺失**。
+- 可选依赖：`openpyxl`（xlsx）、`pypdf`（PDF 内嵌图）。缺 `pypdf` 时 PDF 媒体本次未核，脚本会在盘点与
+  标准输出显式汇报，**不得**当作"材料缺失"。
+
 ## 编排层接入（脚本映射）
 
 调用者唯一：`crwu-audit` 编排层（router）。叶子不得调用校验器/渲染器，也不得生成页面或定义最终字段。
@@ -54,11 +81,12 @@ python3 scripts/test_audit_delivery.py
 3. `authorityClass=external_formal` 必须具备名称、版本次数状态、条款与来源；版本不得写“现行/现行有效”；
 4. `kbRelativePath` 必须是知识库相对路径（拒绝 `/`、盘符、`~`、`file://`）；
 5. `manualConfirmationItems` 不计入不通过数量（`summary.counts` 由明细重算比对）；
-6. `summary.counts`、规则 `usageCount`、`usedByIssueIds`、复核三条带与命中率分母均可由明细重算，不一致即失败；
+6. `summary.counts`、规则 `usageCount`、`usedByIssueIds`、复核三条带及 `reviewItems` 客观命中率均可由明细重算，不一致即失败；
 7. 阶段二完成（`phase2CompletedAt`）时每条阶段一 issue 必须有 `reviewComparison`，复核独有项必须进 `reviewerOnlyItems`；
 8. `reviewAccessedAt` 必须晚于 `phase1FrozenAt`（阶段一先冻结，阶段二才可读复核记录）；
 9. 未检查项 `reasonCode` 受控枚举；`scope.notCheckedItems` 显式（无则空数组）；
 10. 敏感信息扫描：绝对路径、`file://`、`nodeId`、凭据类字段名一律拒绝（§10.1 / §12.2）。
+11. 已关闭的 `false_positive` 不得继续以有效问题项保留在 `issues`；`L-unclosed` 必须同时给出答复与在件核验证据。
 
 ## renderer 行为（§10）
 
@@ -66,9 +94,11 @@ python3 scripts/test_audit_delivery.py
 - **确定性**：同一输入 + 同一 renderer 版本 → 逐字节一致输出（`render` 可重复比对）；
 - **自包含**：CSS 内嵌，无外链字体/样式/脚本/图片，无遥测；动态内容全部 HTML 转义；
 - **独立模板**：页面结构和 CSS 只维护在 `template/audit-report.html`；桌面端左侧目录可直达全部区域，窄屏转为顶部目录，打印时隐藏；
-- **完整结构**：项目信息 → 审核结果概览 → 需要处理的问题 → 需要人工确认事项 → 本次审核依据（含规则地图）
-  → 人工复核对照 → AI 审核评分卡 → 审核范围与未检查项 → 专业审核轨迹（`details` 默认折叠）→ 文件追溯信息；
-- **问题卡片**：规则 → 材料 → 差异 → 结论 → 修改 固定顺序，严重程度**文字标签 + 颜色**并存；
+- **完整结构**：中瑞世联AI审核报告 - [报告流水号ID] → AI 检出的问题项 → AI 外部数据核验结果 → 人工复核对照 → AI 审核表现评分卡
+  → 需要人工确认事项 → 本次审核依据 → 审核范围与未检查项 → 专业审核轨迹（默认折叠）→ 文件追溯信息；
+- **问题卡片**：位置和问题直接可读；修改意见收进“展开修改意见（共 N 项）”，规则、材料、差异与结论收进另一带计数的明确展开控件；打印时两类折叠内容完整展开，严重程度**文字标签 + 颜色**并存；
+- **复核对照**：按文件声明顺序列出复核层级，逐级显示已验证修改、精确/部分/未命中及命中率；`L-unclosed` 高亮呈现答复与实际未落实证据；
+- **客观评分卡**：严格命中率=`exact/evaluable`，覆盖率=`(exact+partial)/evaluable`；`L-resolved` 与 `L-uncheckable` 不进分母，综合率按明细加权重算；
 - **A4 打印**：`@page { size: A4; margin: 16mm 15mm 18mm; }`、卡片 `break-inside: avoid`、表头跨页重复，
   黑白可读；`renderPolicy.printTrail=true` 时轨迹默认展开；
 - **空态显式**：空列表输出“本次无此类事项”，不留空白标题或隐藏事实；

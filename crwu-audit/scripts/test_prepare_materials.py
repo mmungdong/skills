@@ -13,9 +13,14 @@
 5. 源材料目录只读 —— 运行后源目录文件集合不变。
 6. 表格遍历四层边界 —— 扫描边界按**有值格**（不按 dimension、也不按"存在的格"）；
    声明用区远大于有值区时登记表格规范提示；单表超规模上限时记 capability gap 并跳过。
+7. 媒体证据通道 —— 内嵌图/独立图片必须**导出到 `媒体证据/` 并写入 `媒体索引.json`**
+   （此前只登记计数、无读取通道 → 证据在图片里被判"为空/缺失"）；阶段二复核件复跑
+   必须换产物名，**不得覆盖阶段一冻结的 `材料盘点.json`**（复核意见附件里的图同样要被抽取）。
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import importlib.util
 import json
 import shutil
@@ -25,6 +30,46 @@ import zipfile
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
+
+_PNG = base64.b64decode(
+    b"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==")
+
+
+def _minimal_docx_with_image(path: Path) -> Path:
+    """造一个正文第 2 段内联一张图的 `.docx`（复核意见附件常见形态）。"""
+    ct = ('<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/'
+          'content-types"><Default Extension="rels" ContentType="application/vnd.'
+          'openxmlformats-package.relationships+xml"/><Default Extension="xml" '
+          'ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/>'
+          '<Override PartName="/word/document.xml" ContentType="application/vnd.'
+          'openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')
+    rels = ('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/'
+            '2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/'
+            'officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+            '</Relationships>')
+    doc = ('<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/'
+           'wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/'
+           '2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/'
+           'wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+           '<w:body><w:p><w:r><w:t>问题 1：可比案例位置图缺失。</w:t></w:r></w:p>'
+           '<w:p><w:r><w:t>证据截图：</w:t></w:r><w:r><w:drawing><wp:inline><wp:extent cx="1" cy="1"/>'
+           '<wp:docPr id="1" name="P1"/><a:graphic><a:graphicData uri="http://schemas.'
+           'openxmlformats.org/drawingml/2006/picture"><a:blip r:embed="rId10"/></a:graphicData>'
+           '</a:graphic></wp:inline></w:drawing></w:r></w:p></w:body></w:document>')
+    doc_rels = ('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/'
+                '2006/relationships"><Relationship Id="rId10" Type="http://schemas.openxmlformats.org/'
+                'officeDocument/2006/relationships/image" Target="media/image1.png"/></Relationships>')
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", ct)
+        z.writestr("_rels/.rels", rels)
+        z.writestr("word/document.xml", doc)
+        z.writestr("word/_rels/document.xml.rels", doc_rels)
+        z.writestr("word/media/image1.png", _PNG)
+    return path
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _load_module():
@@ -78,6 +123,17 @@ class PrepareMaterialsContractTest(unittest.TestCase):
 
     def _inventory(self):
         return self._payload()["items"]
+
+    def _run_label(self, label: str, src: Path, inventory: str = None,
+                   media_index: str = None):
+        """按阶段标签复跑（阶段二复核件用）：产物名加后缀，不影响阶段一冻结产物。"""
+        return self.module.prepare(
+            str(self.case), str(src),
+            str(self.case / f"提取-{label}"), str(self.case / f"工作版-{label}"),
+            extract_dir=str(self.case / f"解压-{label}"),
+            media_dir=str(self.case / f"媒体证据-{label}"),
+            inventory_name=inventory or f"{label}盘点.json",
+            media_index_name=media_index or f"{label}媒体索引.json")
 
     # ---- 1 缓存值优先 ----------------------------------------------------
     def test_cached_value_wins_over_formula_string(self):
@@ -254,10 +310,11 @@ class PrepareMaterialsContractTest(unittest.TestCase):
 
     # ---- 4c 隐藏区引用审计（只坐标，不读内容）-------------------------------
     def test_hidden_reference_audit_flags_visible_results_depending_on_hidden_inputs(self):
-        """可见公式引用隐藏列/行/隐藏表 → 标记"计算链不可复核"；且不得读隐藏内容。
+        """可见公式引用隐藏列/行/隐藏表 → 记**人工建议检查项**（不是 AI 问题）；且不得读隐藏内容。
 
         对应真实案件：土地表隐藏列 N（账面价值）被 32 处可见公式引用、底稿隐藏评分列
         被 24 处引用 —— 这类隐藏列**是计算输入**，一刀切剔除会让结果不可复核。
+        去向（2026-09-16 用户口径）：审核只要可见区公式计算正确即可 → 只出建议项、不出 `issues[]`。
         """
         import openpyxl
         d = self.src / "定稿"
@@ -286,12 +343,15 @@ class PrepareMaterialsContractTest(unittest.TestCase):
         cells = {h["cell"] for h in rec["hiddenRefs"]}
         self.assertEqual({"P1", "P2", "P5"}, cells, "只报真正引用隐藏区的可见格")
         self.assertEqual(["土地表!P1", "土地表!P2", "土地表!P5"], rec["calcChainNotReproducible"])
+        self.assertIn("manualConfirmationItems", rec["hiddenRefDisposition"],
+                      "去向必须随数据走：人工建议检查项，不作为 AI 问题")
+        self.assertIn("不作为 AI 问题", rec["hiddenRefDisposition"])
         blob = (self.case / "材料盘点.json").read_text(encoding="utf-8")
         for sentinel in ("999999", "888888"):
             self.assertNotIn(sentinel, blob, "引用审计只出坐标，绝不能带出隐藏区内容")
 
     def test_hidden_reference_audit_is_quiet_when_hidden_columns_are_unreferenced(self):
-        """隐藏列仅被隐藏区内部自引用（可见区无引用）→ 不产生"不可复核"结论。"""
+        """隐藏列仅被隐藏区内部自引用（可见区无引用）→ 不产生建议项元数据（无声即无噪声）。"""
         import openpyxl
         d = self.src / "定稿"
         d.mkdir()
@@ -309,6 +369,7 @@ class PrepareMaterialsContractTest(unittest.TestCase):
         rec = self._inventory()[0]["workbook"]
         self.assertEqual([], rec["hiddenRefs"])
         self.assertEqual([], rec["calcChainNotReproducible"])
+        self.assertIsNone(rec["hiddenRefDisposition"], "无引用时不出任何建议项元数据")
 
     # ---- 4d2 多版本隐藏结构比对（H0 元数据级）----------------------------
     def test_same_named_versions_with_different_hidden_structure_flag_drift(self):
@@ -646,6 +707,157 @@ class PrepareMaterialsContractTest(unittest.TestCase):
         self.assertIn("未完整处理", " ".join(rec["capabilityGaps"]))
         self.assertEqual(["正常表"], [s["sheet"] for s in rec["workbook"]["sheets"]],
                          "超限表不进工作版，其余表照常处理")
+
+    # ---- 10 非单元格证据（媒体）不得因工作版丢失而被判"缺失" ----------------
+    def test_raw_media_is_counted_and_flagged_as_non_cell_evidence(self):
+        """原件含内嵌媒体时：登记 `rawMediaCount`，汇总进 `nonCellEvidence` 并提示不得据工作版判缺失。
+
+        真实失效（2026-302150-LX9757-BG8677）：重建工作版丢失全部 `xl/media`（审核对象已非送审件原貌），
+        导致 `MKT-004` 判"可比实例位置图为空、询价截图缺失"，而原件实有 26 个媒体对象。
+        """
+        import openpyxl
+        import shutil
+        import zipfile
+        d = self.src / "定稿"
+        d.mkdir()
+        wb = openpyxl.Workbook()
+        wb.active["A1"] = "x"
+        p = d / "带图.xlsx"
+        wb.save(p)
+        tmp = p.with_suffix(".media.xlsx")          # openpyxl 不写图，直接补 zip 部件模拟内嵌图
+        with zipfile.ZipFile(p) as zin, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                zout.writestr(item, zin.read(item.filename))
+            zout.writestr("xl/media/image1.png", b"\x89PNG\r\n\x1a\n" + b"0" * 64)
+        shutil.move(str(tmp), str(p))
+
+        self._run()
+
+        rec = [i for i in self._inventory() if i["name"] == "带图.xlsx"][0]["workbook"]
+        self.assertEqual(1, rec["rawMediaCount"], "须登记原件媒体数")
+        self.assertEqual(0, rec["mediaCarriedOver"], "重建法不复制媒体，须如实记账")
+        self.assertIn("禁止依据工作版", rec["nonCellEvidenceNote"])
+        nce = self._payload()["nonCellEvidence"]
+        self.assertEqual((1, 1), (nce["filesWithMedia"], nce["rawMediaCount"]))
+        rebuilt = self.case / "工作版/带图.xlsx"
+        self.assertEqual(
+            [], [n for n in zipfile.ZipFile(rebuilt).namelist() if n.startswith("xl/media/")],
+            "工作版不得残留媒体——正因如此，媒体类结论必须回 raw 原件")
+
+    # ---- 11 媒体证据通道：docx 与独立图片也必须导出（此前只有 xlsx 计数）----
+    def test_docx_and_standalone_images_are_exported_into_media_index(self):
+        """docx 内嵌图与独立图片必须落 `媒体证据/` 并进 `媒体索引.json`。
+
+        真实失效：`评估说明.docx` 正文写着"以下为询价截图："，图片被文本抽取静默丢弃，
+        盘点里连媒体字段都没有；独立图片的 note 只有"图片：无 OCR"，没有任何可读路径。
+        """
+        d = self.src / "定稿"
+        d.mkdir()
+        _minimal_docx_with_image(d / "评估说明.docx")
+        (d / "现场照片.png").write_bytes(_PNG)
+
+        self._run()
+
+        items = {r["name"]: r for r in self._inventory()}
+        docx_ev = items["评估说明.docx"]["mediaEvidence"]
+        self.assertEqual(1, docx_ev["exportedCount"], docx_ev)
+        self.assertEqual(1, items["现场照片.png"]["mediaEvidence"]["exportedCount"])
+        self.assertEqual("host-vision", items["现场照片.png"]["mediaEvidence"]["evidenceChannel"])
+
+        idx = json.loads((self.case / "媒体索引.json").read_text(encoding="utf-8"))
+        self.assertEqual(2, idx["count"], idx)
+        for e in idx["entries"]:
+            self.assertTrue((self.case / e["localPath"]).exists(), e)
+            self.assertTrue(e["sha256"] and e["sizeBytes"] > 0, e)
+        locators = sorted(e["locator"] for e in idx["entries"])
+        self.assertTrue(any("图片#" in x for x in locators), locators)
+        self.assertTrue(any("（整图）" in x for x in locators), locators)
+
+        nce = self._payload()["nonCellEvidence"]
+        self.assertEqual(2, nce["filesWithMedia"])
+        self.assertEqual(2, nce["exportedMediaCount"])
+        self.assertEqual("媒体索引.json", nce["mediaIndexPath"])
+
+    def test_unreferenced_media_is_not_silently_dropped(self):
+        """未被 drawing 引用的媒体部件：不导出，但必须留未核原因（未核 ≠ 缺失）。"""
+        import openpyxl
+        d = self.src / "定稿"
+        d.mkdir()
+        wb = openpyxl.Workbook()
+        wb.active["A1"] = "x"
+        p = d / "无锚点图.xlsx"
+        wb.save(p)
+        tmp = p.with_suffix(".media.xlsx")
+        with zipfile.ZipFile(p) as zin, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                zout.writestr(item, zin.read(item.filename))
+            zout.writestr("xl/media/image1.png", _PNG)
+        shutil.move(str(tmp), str(p))
+
+        self._run()
+
+        rec = [r for r in self._inventory() if r["name"] == "无锚点图.xlsx"][0]
+        ev = rec["mediaEvidence"]
+        self.assertEqual(0, ev["exportedCount"], "锚点不可得时不得导出")
+        self.assertTrue(ev["unresolvedCount"] >= 1, ev)
+        self.assertIn("未导出", " ".join(ev["unresolvedReasons"]))
+        self.assertFalse((self.case / "媒体证据").exists() and
+                         any((self.case / "媒体证据").rglob("*.png")),
+                         "锚点不可得的媒体不得落盘")
+
+    # ---- 12 阶段二复跑不得覆盖阶段一冻结产物 ------------------------------
+    def test_review_pass_does_not_clobber_phase1_artifacts(self):
+        """阶段二对 `复核-人工/` 复跑：抽复核件媒体，但阶段一冻结产物逐字节不变。"""
+        d = self.src / "定稿"
+        d.mkdir()
+        _minimal_docx_with_image(d / "评估说明.docx")
+        self._run()
+        inv_before = _sha256(self.case / "材料盘点.json")
+        idx_before = _sha256(self.case / "媒体索引.json")
+
+        review = self.case / "复核-人工"
+        review.mkdir()
+        _minimal_docx_with_image(review / "三级复核意见.docx")
+
+        self._run_label("复核", review)
+
+        self.assertEqual(inv_before, _sha256(self.case / "材料盘点.json"),
+                         "阶段一盘点表是冻结产物，阶段二复跑不得改写")
+        self.assertEqual(idx_before, _sha256(self.case / "媒体索引.json"),
+                         "阶段一媒体索引同样不得被阶段二覆盖")
+        idx = json.loads((self.case / "复核媒体索引.json").read_text(encoding="utf-8"))
+        self.assertEqual(1, idx["count"], idx)
+        self.assertIn("复核意见", json.dumps(idx, ensure_ascii=False))
+        self.assertTrue((self.case / "复核盘点.json").exists())
+        # 复核件的媒体落在独立的媒体证据目录，不混入阶段一目录
+        self.assertTrue(next((self.case / "媒体证据-复核").rglob("*.png"), None))
+
+
+    # ---- 13 CLI：相对 --src 必须相对 --case 解析 --------------------------
+    def test_cli_relative_src_resolves_against_case(self):
+        """`--src 复核-人工` 必须解析到 `<案例>/复核-人工`，而不是当前工作目录。
+
+        真实踩坑：SKILL.md 里的阶段二命令是 `--case <案例目录> --src 复核-人工 --label 复核`，
+        若相对路径按 cwd 解析，命令会直接报"源材料目录不存在"。
+        """
+        import sys
+        review = self.case / "复核-人工"
+        review.mkdir()
+        _minimal_docx_with_image(review / "三级复核意见.docx")
+
+        saved = sys.argv
+        sys.argv = ["prepare_materials.py", "--case", str(self.case),
+                    "--src", "复核-人工", "--label", "复核"]
+        try:
+            rc = self.module.main()
+        finally:
+            sys.argv = saved
+
+        self.assertEqual(0, rc)
+        idx = json.loads((self.case / "复核媒体索引.json").read_text(encoding="utf-8"))
+        self.assertEqual(1, idx["count"], idx)
+        self.assertFalse((self.case / "材料盘点.json").exists(),
+                         "只跑阶段二时不应产出阶段一盘点表")
 
 
 if __name__ == "__main__":

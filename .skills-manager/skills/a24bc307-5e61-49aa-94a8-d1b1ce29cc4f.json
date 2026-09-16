@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "a24bc307-5e61-49aa-94a8-d1b1ce29cc4f",
+  "path": "crwu-audit-asset-intangible",
+  "path_key": "crwu-audit-asset-intangible",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-asset-intangible",
+    "branch": null
+  }
+}

@@ -44,7 +44,7 @@ description: >-
 - 与知识库口径：全部核验口径、数据项取舍与结论档位以库内 `M-外部数据核验` 模块规程为准；
   本技能只提供能力与执行规程，并叠加"单源（同花顺 iFinD）、不启用万得"这一环境事实。
 - 与非本技能职责的边界：报告内部与跨表数字勾稽 → `crwu-audit-datacheck`；披露完整性通用检查 →
-  `crwu-audit-public-general-standards`；参数合理性与方法判断 → 方法轴技能与人工。
+  `crwu-dev-audit-public-general-standards`；参数合理性与方法判断 → 方法轴技能与人工。
 
 ## 数据源与两条取数路径（同花顺 iFinD）
 

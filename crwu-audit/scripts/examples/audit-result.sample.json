@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "auditTask": {
     "projectId": "PRJ-2026-0001",
     "reportVersion": "v1.0",
@@ -326,6 +326,106 @@
   },
   "reviewComparison": {
     "status": "performed",
+    "reviewFiles": [
+      {
+        "order": 1,
+        "level": "一级复核",
+        "displayName": "01-一级复核意见.docx",
+        "version": "v1"
+      },
+      {
+        "order": 2,
+        "level": "二级复核",
+        "displayName": "02-二级复核意见.docx",
+        "version": "v2"
+      }
+    ],
+    "reviewItems": [
+      {
+        "itemId": "RV-001",
+        "title": "报告结论与测算表不一致",
+        "module": "数据勾稽",
+        "reviewLevel": "一级复核",
+        "matchStatus": "exact",
+        "linkedIssueIds": [
+          "ISS-DC-003"
+        ],
+        "reviewerEvidence": {
+          "file": "01-一级复核意见.docx",
+          "locator": "第1条",
+          "quote": "报告结论与测算表不一致。"
+        },
+        "inFileResolution": "L-open",
+        "inFileEvidence": {
+          "file": "报告-复审版.docx",
+          "locator": "第12页",
+          "quote": "结论仍为1,244.00。"
+        },
+        "handling": "继续修改"
+      },
+      {
+        "itemId": "RV-002",
+        "title": "披露文字已补充",
+        "module": "报告披露",
+        "reviewLevel": "一级复核",
+        "matchStatus": "miss",
+        "linkedIssueIds": [],
+        "reviewerEvidence": {
+          "file": "01-一级复核意见.docx",
+          "locator": "第2条",
+          "quote": "补充评估范围说明。"
+        },
+        "inFileResolution": "L-resolved",
+        "inFileEvidence": {
+          "file": "报告-复审版.docx",
+          "locator": "第5页",
+          "quote": "已补充完整。"
+        },
+        "handling": "无需继续处理"
+      },
+      {
+        "itemId": "RV-003",
+        "title": "答复称已修复但仍未落实",
+        "module": "市场法",
+        "reviewLevel": "二级复核",
+        "matchStatus": "miss",
+        "linkedIssueIds": [],
+        "reviewerEvidence": {
+          "file": "02-二级复核意见.docx",
+          "locator": "第1条",
+          "quote": "补充时间修正依据。"
+        },
+        "inFileResolution": "L-unclosed",
+        "inFileEvidence": {
+          "file": "评估说明-复审版.docx",
+          "locator": "市场法章节",
+          "quote": "仍未见时间修正依据。"
+        },
+        "closureEvidence": {
+          "file": "项目答复.docx",
+          "locator": "答复1",
+          "quote": "已补充。"
+        },
+        "handling": "优先回客户"
+      },
+      {
+        "itemId": "RV-004",
+        "title": "扫描件内容无法核验",
+        "module": "市场法",
+        "reviewLevel": "二级复核",
+        "matchStatus": "partial",
+        "linkedIssueIds": [
+          "ISS-MKT-007"
+        ],
+        "reviewerEvidence": {
+          "file": "02-二级复核意见.docx",
+          "locator": "第2条",
+          "quote": "核验扫描件附件。"
+        },
+        "inFileResolution": "L-uncheckable",
+        "handling": "补充可读文件"
+      }
+    ],
     "bands": {
       "overlap": 1,
       "aiOnly": 1,
@@ -351,10 +451,15 @@
       }
     ],
     "metrics": {
-      "aiHitRate": "0.50",
-      "denominator": "2 条复核事项（示意）",
-      "denominatorExclResolved": "1 条未落实",
-      "aiHitRateExclResolved": "0.00"
+      "total": 4,
+      "resolved": 1,
+      "uncheckable": 1,
+      "evaluable": 2,
+      "exactHits": 1,
+      "partialHits": 0,
+      "misses": 1,
+      "strictHitRate": 50.0,
+      "coverageRate": 50.0
     }
   },
   "scope": {
@@ -473,7 +578,7 @@
   },
   "fileTrace": {
     "generatedAt": "2026-09-10T09:30:00+08:00",
-    "rendererVersion": "renderer/1.0.0",
+    "rendererVersion": "renderer/1.2.1",
     "sourceDigest": "",
     "embeddedJsonDigest": ""
   },
@@ -567,15 +672,14 @@
   "selfAuditErrors": [
     {
       "errorId": "SAE-001",
-      "kind": "false_positive",
+      "kind": "wording",
       "discoveredAt": "初审",
-      "description": "（示意）初审阶段自查发现 1 条结论不成立，已撤回。",
+      "description": "（示意）初审阶段自查发现问题描述不够精确，已统一表述。",
       "evidence": [
         "issues[ISS-DC-003]"
       ],
-      "correction": "撤回该条",
-      "status": "closed",
-      "issueId": "ISS-DC-003"
+      "correction": "保留问题项并修正表述",
+      "status": "closed"
     },
     {
       "errorId": "SAE-002",

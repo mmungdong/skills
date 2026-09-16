@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CRWU 审核意见交付工具：AuditResult 校验 + 单文件 HTML 渲染。
 
-实现《CRWU 审核意见 HTML 送达规范 v1.0》
+实现《CRWU 审核意见 HTML 送达规范 v1.1》
 （正文：本技能 references/11-html-delivery-spec.md）：
 
 - AuditResult JSON 是唯一事实源；HTML 仅如实呈现，不新增/删除/合并/改写任何结论；
@@ -24,7 +24,7 @@ import re
 import sys
 from pathlib import Path
 
-RENDERER_VERSION = "renderer/1.1.0"
+RENDERER_VERSION = "renderer/1.2.1"
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "template" / "audit-report.html"
 SCHEMA_VERSION_PREFIX = "1."
 
@@ -36,6 +36,16 @@ ISSUE_TYPE_LABEL = {
     "unsupported_pending": "无依据待判",
 }
 DECISION_LABEL = {"fail": "不符合", "pending_confirmation": "需人工确认", "pass": "符合"}
+MODULE_LABEL = {
+    "dataCheck": "数据勾稽",
+    "marketApproach": "市场法",
+    "incomeApproach": "收益法",
+    "costApproach": "成本法",
+    "assetBasis": "资产基础法",
+    "reportDisclosure": "报告披露",
+    "generalStandards": "通用准则与程序",
+    "externalData": "外部数据核验",
+}
 OVERALL_LABEL = {"fail": "存在需要处理的问题", "pending_confirmation": "有待人工确认事项", "pass": "本次未发现需要处理的问题"}
 AUTHORITY_LABEL = {
     "external_formal": "外部正式依据",
@@ -59,6 +69,12 @@ REVIEW_CATEGORY_LABEL = {
     "C": "AI 与复核均涉及但结论或范围不同",
 }
 REVIEWER_ONLY_LABEL = "仅人工复核发现"
+REVIEW_MATCH_VALUES = {"exact", "partial", "miss"}
+REVIEW_MATCH_LABEL = {
+    "exact": "AI 精确命中",
+    "partial": "AI 部分命中",
+    "miss": "AI 未命中",
+}
 REASON_LABEL = {
     "missing_material": "缺材料",
     "unreadable": "不可读",
@@ -197,6 +213,39 @@ IN_FILE_RESOLUTION_LABEL = {
 }
 # 受控占位标签：无在件位置时不得留空白单元格（送达规范 §10.3）
 IN_FILE_ABSENT_LABEL = "未做在件核验（材料不可及或超出本次范围）"
+
+
+def _percentage(numerator: int, denominator: int):
+    return round(numerator * 100.0 / denominator, 1) if denominator else None
+
+
+def _review_metrics(items: list) -> dict:
+    """从逐条复核事实重算客观指标；已落实与无法核验不进入命中率分母。"""
+    resolved = [item for item in items if item.get("inFileResolution") == "L-resolved"]
+    uncheckable = [item for item in items if item.get("inFileResolution") == "L-uncheckable"]
+    evaluable_items = [
+        item for item in items
+        if item.get("inFileResolution") not in ("L-resolved", "L-uncheckable")
+    ]
+    exact = sum(item.get("matchStatus") == "exact" for item in evaluable_items)
+    partial = sum(item.get("matchStatus") == "partial" for item in evaluable_items)
+    misses = sum(item.get("matchStatus") == "miss" for item in evaluable_items)
+    denominator = len(evaluable_items)
+    return {
+        "total": len(items),
+        "resolved": len(resolved),
+        "uncheckable": len(uncheckable),
+        "evaluable": denominator,
+        "exactHits": exact,
+        "partialHits": partial,
+        "misses": misses,
+        "strictHitRate": _percentage(exact, denominator),
+        "coverageRate": _percentage(exact + partial, denominator),
+    }
+
+
+def _format_rate(value) -> str:
+    return "不适用" if value is None else "{0:.1f}%".format(float(value))
 
 
 # --------------------------------------------------------------------------- #
@@ -588,6 +637,96 @@ def validate(result: dict, rendered: bool = False, expect_renderer: bool = False
                 closure = item.get("closureEvidence") or {}
                 if not (_is_nonempty_str(closure.get("file")) and _is_nonempty_str(closure.get("locator"))):
                     errors.append("{0}.inFileResolution=L-unclosed 必须给出 closureEvidence（答复出处）".format(where))
+
+    # 新版逐条复核事实源：文件顺序、逐条命中和指标全部可重算。
+    review_files = comparison.get("reviewFiles")
+    review_items = comparison.get("reviewItems")
+    if review_files is not None or review_items is not None:
+        if not isinstance(review_files, list) or not review_files:
+            errors.append("reviewComparison.reviewFiles 必须是非空数组（按实际复核顺序登记）")
+            review_files = []
+        if not isinstance(review_items, list):
+            errors.append("reviewComparison.reviewItems 必须是数组")
+            review_items = []
+
+        file_orders = set()
+        file_names = set()
+        levels = set()
+        for index, entry in enumerate(review_files):
+            where = "reviewComparison.reviewFiles[{0}]".format(index)
+            if not isinstance(entry, dict):
+                errors.append("{0} 必须是对象".format(where))
+                continue
+            for field in ("order", "level", "displayName", "version"):
+                if field == "order":
+                    if not isinstance(entry.get(field), int) or entry.get(field) < 1:
+                        errors.append("{0}.order 必须是从 1 开始的整数".format(where))
+                elif not _is_nonempty_str(entry.get(field)):
+                    errors.append("{0}.{1} 不得为空".format(where, field))
+            if entry.get("order") in file_orders:
+                errors.append("reviewComparison.reviewFiles.order 重复：{0}".format(entry.get("order")))
+            file_orders.add(entry.get("order"))
+            file_names.add(str(entry.get("displayName")))
+            levels.add(str(entry.get("level")))
+        if review_files and sorted(file_orders) != list(range(1, len(review_files) + 1)):
+            errors.append("reviewComparison.reviewFiles.order 必须连续且可排序")
+
+        item_ids = set()
+        for index, item in enumerate(review_items):
+            where = "reviewComparison.reviewItems[{0}]".format(index)
+            if not isinstance(item, dict):
+                errors.append("{0} 必须是对象".format(where))
+                continue
+            for field in ("itemId", "title", "module", "reviewLevel", "matchStatus", "reviewerEvidence", "linkedIssueIds", "inFileResolution", "handling"):
+                if field not in item:
+                    errors.append("{0} 缺少字段 {1}".format(where, field))
+            item_id = item.get("itemId")
+            if not _is_nonempty_str(item_id):
+                errors.append("{0}.itemId 不得为空".format(where))
+            elif item_id in item_ids:
+                errors.append("reviewComparison.reviewItems.itemId 重复：{0}".format(item_id))
+            item_ids.add(item_id)
+            if item.get("matchStatus") not in REVIEW_MATCH_VALUES:
+                errors.append("{0}.matchStatus 必须为 exact/partial/miss".format(where))
+            if item.get("reviewLevel") not in levels:
+                errors.append("{0}.reviewLevel 未在 reviewFiles 中登记".format(where))
+            evidence = item.get("reviewerEvidence") or {}
+            for field in ("file", "locator", "quote"):
+                if not _is_nonempty_str(evidence.get(field)):
+                    errors.append("{0}.reviewerEvidence.{1} 不得为空".format(where, field))
+            if _is_nonempty_str(evidence.get("file")) and str(evidence.get("file")) not in file_names:
+                errors.append("{0}.reviewerEvidence.file 未在 reviewFiles 中登记".format(where))
+            linked = item.get("linkedIssueIds")
+            if not isinstance(linked, list):
+                errors.append("{0}.linkedIssueIds 必须是数组".format(where))
+            elif item.get("matchStatus") in ("exact", "partial") and not linked:
+                errors.append("{0} AI 命中项必须关联至少一个 issueId".format(where))
+            elif any(issue_id not in seen_issue_ids for issue_id in linked):
+                errors.append("{0}.linkedIssueIds 含不存在的 issueId".format(where))
+            resolution = item.get("inFileResolution")
+            if resolution not in IN_FILE_RESOLUTION_VALUES:
+                errors.append("{0}.inFileResolution 取值非法".format(where))
+            elif resolution in ("L-resolved", "L-open", "L-unclosed"):
+                in_file = item.get("inFileEvidence") or {}
+                for field in ("file", "locator"):
+                    if not _is_nonempty_str(in_file.get(field)):
+                        errors.append("{0}.{1} 必须给出在件核验证据".format(where, field))
+            if resolution == "L-unclosed":
+                closure = item.get("closureEvidence") or {}
+                for field in ("file", "locator"):
+                    if not _is_nonempty_str(closure.get(field)):
+                        errors.append("{0}.closureEvidence.{1} 不得为空".format(where, field))
+
+        expected_metrics = _review_metrics(review_items)
+        metrics = comparison.get("metrics")
+        if not isinstance(metrics, dict):
+            errors.append("reviewComparison.metrics 必须是对象且可由 reviewItems 重算")
+        else:
+            for key, expected in expected_metrics.items():
+                if metrics.get(key) != expected:
+                    errors.append(
+                        "reviewComparison.metrics.{0} 必须可由 reviewItems 重算（应为 {1}）".format(key, expected)
+                    )
     hidden_access = comparison.get("hiddenRegionAccess")
     if hidden_access is not None:
         if not isinstance(hidden_access, list):
@@ -619,7 +758,7 @@ def validate(result: dict, rendered: bool = False, expect_renderer: bool = False
                         "reviewComparison.bands.{0} 必须可由明细重算（应为 {1}）".format(band, expected)
                     )
         metrics = comparison.get("metrics") or {}
-        if not isinstance(metrics, dict) or not _is_nonempty_str(metrics.get("denominator")):
+        if review_items is None and (not isinstance(metrics, dict) or not _is_nonempty_str(metrics.get("denominator"))):
             errors.append("reviewComparison.metrics.denominator 不得为空（命中率必须给出分母口径）")
         for index, issue in enumerate(issues):
             if isinstance(issue, dict):
@@ -888,6 +1027,14 @@ def validate(result: dict, rendered: bool = False, expect_renderer: bool = False
             errors.append("{0}.description 不得为空".format(where))
         if item.get("status") is not None and item.get("status") not in ("open", "closed"):
             errors.append("{0}.status 取值非法：{1}".format(where, item.get("status")))
+        if (
+            item.get("kind") == "false_positive"
+            and item.get("status") == "closed"
+            and item.get("issueId") in seen_issue_ids
+        ):
+            errors.append(
+                "{0} 已关闭假阳性不得仍保留在 issues；请撤回对应问题项或改正错误记录".format(where)
+            )
 
     return errors
 
@@ -904,6 +1051,12 @@ def _text(value) -> str:
 def _dt(value: str) -> str:
     parsed = _parse_time(str(value))
     return parsed.isoformat() if parsed else str(value)
+
+
+def _readable_status(value) -> str:
+    if value is True:
+        return '<span class="readable-status is-readable" title="可读" aria-label="可读">✅</span>'
+    return '<span class="readable-status is-unreadable" title="不可读" aria-label="不可读">❌</span>'
 
 
 def _span(cls: str, value) -> str:
@@ -952,15 +1105,18 @@ def _issue_card(issue) -> str:
     cards = ['<article class="issue-card {0}">'.format(SEVERITY_CLASS.get(issue.get("severity"), ""))]
     cards.append('<header class="issue-head">')
     cards.append("<h3>{0}</h3>".format(_span("issue-title", issue.get("title"))))
-    cards.append(
-        '<p class="issue-meta">{0}{1}{2}{3}{4}</p>'.format(
-            _span("issue-id", issue.get("issueId")),
-            _span("severity-label", SEVERITY_LABEL.get(issue.get("severity"), issue.get("severity"))),
-            _span("type-label", ISSUE_TYPE_LABEL.get(issue.get("issueType"), issue.get("issueType"))),
-            _span("decision-label", DECISION_LABEL.get(issue.get("decision"), issue.get("decision"))),
-            _span("location", issue.get("locationSummary")),
-        )
-    )
+    cards.append('<div class="issue-meta">')
+    cards.append('<span class="meta-chip issue-id">{0}</span>'.format(_text(issue.get("issueId"))))
+    cards.append('<span class="meta-chip module-label">{0}：{1}</span>'.format(
+        _text("问题方向"), _text(MODULE_LABEL.get(issue.get("module"), issue.get("module")))))
+    cards.append('<span class="meta-chip severity-label">{0}：{1}</span>'.format(
+        _text("严重程度"), _text(SEVERITY_LABEL.get(issue.get("severity"), issue.get("severity")))))
+    cards.append('<span class="meta-chip type-label">{0}：{1}</span>'.format(
+        _text("问题类型"), _text(ISSUE_TYPE_LABEL.get(issue.get("issueType"), issue.get("issueType")))))
+    cards.append('<span class="meta-chip decision-label">{0}：{1}</span>'.format(
+        _text("判定"), _text(DECISION_LABEL.get(issue.get("decision"), issue.get("decision")))))
+    cards.append('</div><p class="issue-location"><strong>{0}</strong>{1}</p>'.format(
+        _text("问题位置："), _text(issue.get("locationSummary"))))
     cards.append("</header>")
     cards.append(
         '<p class="problem">{0}{1}</p>'.format(
@@ -968,11 +1124,21 @@ def _issue_card(issue) -> str:
         )
     )
 
-    cards.append('<section class="stage stage-rule"><h4>{0}</h4>'.format(_text("规则")))
+    recommended_edits = issue.get("recommendedEdits") or []
+    cards.append('<details class="issue-edits"><summary>{0}</summary>'.format(
+        _text("展开修改意见（共 {0} 项）".format(len(recommended_edits)))))
+    cards.append('<section class="stage stage-edit action-panel"><h4>{0}</h4>'.format(_text("建议修改")))
+    cards.append(_list_block(recommended_edits, _edit_item) if recommended_edits else _list_block([], None))
+    cards.append("</section></details>")
+
+    cards.append('<details class="issue-evidence"><summary>{0}</summary>'.format(
+        _text("展开判断依据与规则（{0} 条规则，{1} 条材料）".format(
+            len(issue.get("ruleEvidence") or []), len(issue.get("materialEvidence") or [])))))
+    cards.append('<section class="stage stage-rule"><h4>{0}</h4>'.format(_text("规则依据")))
     cards.append(_list_block(issue.get("ruleEvidence"), _rule_evidence_item) if issue.get("ruleEvidence") else _list_block([], None))
     cards.append("</section>")
 
-    cards.append('<section class="stage stage-material"><h4>{0}</h4>'.format(_text("材料")))
+    cards.append('<section class="stage stage-material"><h4>{0}</h4>'.format(_text("材料证据")))
     cards.append(_list_block(issue.get("materialEvidence"), _material_evidence_item) if issue.get("materialEvidence") else _list_block([], None))
     cards.append("</section>")
 
@@ -1006,18 +1172,13 @@ def _issue_card(issue) -> str:
         )
     )
 
-    cards.append('<section class="stage stage-edit"><h4>{0}</h4>'.format(_text("修改")))
-    cards.append(_list_block(issue.get("recommendedEdits"), _edit_item) if issue.get("recommendedEdits") else _list_block([], None))
-    cards.append("</section>")
+    cards.append("</details>")
 
     comparison = issue.get("reviewComparison") or {}
     if comparison.get("status") == "performed":
-        cards.append(
-            '<details class="issue-compare"><summary>{0}</summary><table class="kv">{1}</table></details>'.format(
-                _text("人工复核对照"),
-                _rows([("对照分类", REVIEW_CATEGORY_LABEL.get(comparison.get("category"), comparison.get("category")))]),
-            )
-        )
+        cards.append('<p class="issue-review-status"><strong>{0}</strong>{1}</p>'.format(
+            _text("人工复核对照："),
+            _text(REVIEW_CATEGORY_LABEL.get(comparison.get("category"), comparison.get("category")))))
     else:
         cards.append(
             '<p class="compare-status">{0}{1}</p>'.format(
@@ -1086,98 +1247,64 @@ def _manual_item(item) -> str:
 
 
 
-SCORECARD_DIMENSION_LABEL = dict(SCORECARD_DIMENSIONS)
-SCORECARD_COMPOSITE_LABEL = {"aiOnly": "综合·AI 单机", "withHumanLoop": "综合·含人机复核闭环"}
-SCORECARD_LABEL = "本次 AI 审核六维评分卡"
-SCORECARD_LEVEL_LABEL = "审核级次"
-SCORECARD_CORRECTION_LABEL = "复审校正（只增不覆盖）"
-SELF_ERROR_LABEL = "AI 审核错误项"
-SCORECARD_COL_DIMENSION = "维度"
-SCORECARD_COL_FIRST = "初审分"
-SCORECARD_COL_CORRECTION = "复审校正"
-SCORECARD_COL_FINAL = "最终分"
-SCORECARD_COL_BASIS = "打分依据"
-SCORECARD_COL_REASON = "校正理由"
-SCORECARD_COL_ERROR_ID = "编号"
-SCORECARD_COL_ERROR_KIND = "错误类型"
-SCORECARD_COL_ERROR_AT = "发现级次"
-SCORECARD_COL_ERROR_DESC = "说明"
-SCORECARD_COL_ERROR_FIX = "处置"
+def _metric_cells(metrics: dict) -> str:
+    return "".join(
+        "<td>{0}</td>".format(_text(value))
+        for value in (
+            metrics["total"], metrics["resolved"], metrics["uncheckable"], metrics["evaluable"],
+            metrics["exactHits"], metrics["partialHits"], metrics["misses"],
+            _format_rate(metrics["strictHitRate"]), _format_rate(metrics["coverageRate"]),
+        )
+    )
 
 
-def _scorecard_section(scorecard, self_errors) -> str:
-    """AI 审核评分卡（表格呈现）：六维分数 + 复审校正 + 综合分 + 审核错误项。"""
-    corrections = {c.get("key"): c for c in (scorecard.get("corrections") or []) if isinstance(c, dict)}
-    rows = []
-    for dim in scorecard.get("dimensions") or []:
-        key = dim.get("key")
-        cor = corrections.get(key)
-        rows.append(
-            "<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td></tr>".format(
-                _text(dim.get("label")),
-                _text(dim.get("score")),
-                _text(cor.get("to")) if cor else _text(EMPTY_TEXT),
-                _text(cor.get("to") if cor else dim.get("score")),
-                _text(dim.get("basis")),
-            )
-        )
-    composites = scorecard.get("composites") or {}
-    comp_rows = []
-    for field in ("aiOnly", "withHumanLoop"):
-        if field == "withHumanLoop" and composites.get(field) is None:
-            continue
-        comp_rows.append(
-            "<tr><th scope=\"row\">{0}</th><td>{1}</td></tr>".format(
-                _text(SCORECARD_COMPOSITE_LABEL[field]), _text(composites.get(field))
-            )
-        )
-    cor_rows = []
-    for cor in scorecard.get("corrections") or []:
-        cor_rows.append(
-            "<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td></tr>".format(
-                _text(SCORECARD_DIMENSION_LABEL.get(cor.get("key"), cor.get("key"))),
-                _text(cor.get("from")), _text(cor.get("to")), _text(cor.get("reason")),
-            )
-        )
-    err_rows = []
-    for item in self_errors or []:
-        err_rows.append(
-            "<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td></tr>".format(
-                _text(item.get("errorId")),
-                _text(SCORECARD_ERROR_KIND_LABEL.get(item.get("kind"), item.get("kind"))),
-                _text(item.get("discoveredAt")),
-                _text(item.get("description")),
-                _text(item.get("correction")),
-            )
-        )
-    parts = ["<section id=\"ai-scorecard\">", "<h3>{0}</h3>".format(_text(SCORECARD_LABEL))]
-    parts.append("<table class=\"kv\"><tr><th scope=\"row\">{0}</th><td>{1}</td></tr></table>".format(
-        _text(SCORECARD_LEVEL_LABEL), _text(scorecard.get("level"))))
-    parts.append("<table><thead><tr><th>{0}</th><th>{1}</th><th>{2}</th><th>{3}</th><th>{4}</th></tr></thead><tbody>".format(
-        _text(SCORECARD_COL_DIMENSION), _text(SCORECARD_COL_FIRST), _text(SCORECARD_COL_CORRECTION),
-        _text(SCORECARD_COL_FINAL), _text(SCORECARD_COL_BASIS)))
-    parts.extend(rows)
-    parts.append("</tbody></table>")
-    if comp_rows:
-        parts.append("<table class=\"kv\">{0}</table>".format("".join(comp_rows)))
-    if cor_rows:
-        parts.append("<h4>{0}</h4>".format(_text(SCORECARD_CORRECTION_LABEL)))
-        parts.append("<table><thead><tr><th>{0}</th><th>{1}</th><th>{2}</th><th>{3}</th></tr></thead><tbody>".format(
-            _text(SCORECARD_COL_DIMENSION), _text(SCORECARD_COL_FIRST), _text(SCORECARD_COL_FINAL),
-            _text(SCORECARD_COL_REASON)))
-        parts.extend(cor_rows)
-        parts.append("</tbody></table>")
-    parts.append("<h4>{0}</h4>".format(_text(SELF_ERROR_LABEL)))
-    if err_rows:
-        parts.append("<table><thead><tr><th>{0}</th><th>{1}</th><th>{2}</th><th>{3}</th><th>{4}</th></tr></thead><tbody>".format(
-            _text(SCORECARD_COL_ERROR_ID), _text(SCORECARD_COL_ERROR_KIND),
-            _text(SCORECARD_COL_ERROR_AT), _text(SCORECARD_COL_ERROR_DESC),
-            _text(SCORECARD_COL_ERROR_FIX)))
-        parts.extend(err_rows)
-        parts.append("</tbody></table>")
+def _performance_table(items: list, group_key: str, title: str) -> str:
+    groups = {}
+    for item in items:
+        groups.setdefault(str(item.get(group_key) or "未分类"), []).append(item)
+    parts = ["<h3>{0}</h3>".format(_text(title)), '<div class="table-scroll"><table class="performance-table">']
+    parts.append("<thead><tr>" + "".join(
+        '<th scope="col">{0}</th>'.format(_text(label))
+        for label in ("维度", "意见", "已验证修改", "无法核验", "可评价", "精确命中", "部分命中", "未命中", "严格命中率", "覆盖率")
+    ) + "</tr></thead><tbody>")
+    for name, grouped in groups.items():
+        parts.append("<tr><th scope=\"row\">{0}</th>{1}</tr>".format(_text(name), _metric_cells(_review_metrics(grouped))))
+    parts.append("</tbody></table></div>")
+    return "".join(parts)
+
+
+def _scorecard_section(comparison, self_errors) -> str:
+    """仅以逐条复核事实计算百分比；不再把主观 0–10 自评分作为员工端评分卡。"""
+    items = comparison.get("reviewItems") or []
+    metrics = _review_metrics(items)
+    parts = ['<section id="ai-scorecard">', '<h2>{0}</h2>'.format(_text("AI 审核表现评分卡"))]
+    if not items:
+        parts.append('<p class="empty">{0}</p>'.format(_text("缺少完整逐条复核数据，无法计算客观命中率")))
     else:
-        parts.append("<p class=\"empty\">{0}</p>".format(_text(EMPTY_TEXT)))
-    parts.append("</section>")
+        parts.append('<div class="score-hero"><div><span>{0}</span><strong>{1}</strong></div><div><span>{2}</span><strong>{3}</strong></div></div>'.format(
+            _text("综合严格命中率"), _text(_format_rate(metrics["strictHitRate"])),
+            _text("综合覆盖率"), _text(_format_rate(metrics["coverageRate"]))))
+        parts.append('<p class="formula">{0}：{1} ÷ {2}；{3}：({1} + {4}) ÷ {2}。{5}</p>'.format(
+            _text("严格命中率"), _text(metrics["exactHits"]), _text(metrics["evaluable"]),
+            _text("覆盖率"), _text(metrics["partialHits"]),
+            _text("已验证修改和无法核验项不进入分母；综合值按全部有效明细汇总，不取各维度百分比平均。")))
+        parts.append(_performance_table(items, "reviewLevel", "按复核级次"))
+        parts.append(_performance_table(items, "module", "按问题模块"))
+    parts.append('<details class="secondary-details"><summary>{0}</summary>'.format(
+        _text("展开 AI 自查错误记录（共 {0} 条）".format(len(self_errors or [])))))
+    if self_errors:
+        parts.append('<div class="table-scroll"><table><thead><tr>' + "".join(
+            '<th scope="col">{0}</th>'.format(_text(label))
+            for label in ("编号", "错误类型", "发现级次", "说明", "处置")
+        ) + '</tr></thead><tbody>')
+        for item in self_errors:
+            parts.append("<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td></tr>".format(
+                _text(item.get("errorId")), _text(SCORECARD_ERROR_KIND_LABEL.get(item.get("kind"), item.get("kind"))),
+                _text(item.get("discoveredAt")), _text(item.get("description")), _text(item.get("correction"))))
+        parts.append("</tbody></table></div>")
+    else:
+        parts.append('<p class="empty">{0}</p>'.format(_text(EMPTY_TEXT)))
+    parts.append("</details></section>")
     return "".join(parts)
 
 
@@ -1202,6 +1329,96 @@ def _reviewer_only_item(item) -> str:
     return (
         "<h4>{0}</h4><table class=\"kv\">{1}</table>"
     ).format(_text(item.get("title")), _rows(rows))
+
+
+def _review_item_card(item) -> str:
+    evidence = item.get("reviewerEvidence") or {}
+    in_file = item.get("inFileEvidence") or {}
+    closure = item.get("closureEvidence") or {}
+    resolution = item.get("inFileResolution")
+    rows = [
+        ("编号", item.get("itemId")),
+        ("问题方向", item.get("module")),
+        ("AI 对照", REVIEW_MATCH_LABEL.get(item.get("matchStatus"), item.get("matchStatus"))),
+        ("关联 AI 问题", "、".join(item.get("linkedIssueIds") or []) or "无"),
+        ("复核文件", evidence.get("file")),
+        ("复核定位", evidence.get("locator")),
+        ("复核原文", evidence.get("quote")),
+        ("在件核验", IN_FILE_RESOLUTION_LABEL.get(resolution, resolution)),
+        ("被审件文件", in_file.get("file") or IN_FILE_ABSENT_LABEL),
+        ("被审件定位", in_file.get("locator") or IN_FILE_ABSENT_LABEL),
+        ("被审件证据", in_file.get("quote") or IN_FILE_ABSENT_LABEL),
+        ("处理", item.get("handling")),
+    ]
+    if resolution == "L-unclosed":
+        rows.extend([
+            ("答复文件", closure.get("file")),
+            ("答复定位", closure.get("locator")),
+            ("答复原文", closure.get("quote")),
+        ])
+    alert_class = " review-item-unclosed" if resolution == "L-unclosed" else ""
+    return '<article class="review-item{0}"><h4>{1}</h4><table class="kv">{2}</table></article>'.format(
+        alert_class, _text(item.get("title")), _rows(rows))
+
+
+def _review_comparison_section(comparison) -> str:
+    parts = ['<section id="review-comparison">', '<h2>{0}</h2>'.format(_text("人工复核对照"))]
+    if comparison.get("status") != "performed":
+        parts.append('<p class="empty">{0}</p></section>'.format(_text("本次未执行人工复核对照")))
+        return "".join(parts)
+    files = sorted(comparison.get("reviewFiles") or [], key=lambda item: item.get("order", 9999))
+    items = comparison.get("reviewItems") or []
+    if not items:
+        parts.append('<p class="legacy-note">{0}</p>'.format(_text("当前结果仅含旧版复核汇总，未提供逐条复核文件与意见清单。")))
+        reviewer_items = comparison.get("reviewerOnlyItems") or []
+        parts.append(_list_block(reviewer_items, _reviewer_only_item, empty_text=EMPTY_TEXT))
+        parts.append("</section>")
+        return "".join(parts)
+    metrics = _review_metrics(items)
+    unclosed = sum(item.get("inFileResolution") == "L-unclosed" for item in items)
+    parts.append('<div class="review-kpis">')
+    for label, value, cls in (
+        ("复核意见", metrics["total"], ""), ("已验证修改", metrics["resolved"], "good"),
+        ("AI 精确命中", metrics["exactHits"], "good"), ("AI 未命中", metrics["misses"], "warning"),
+        ("严格命中率", _format_rate(metrics["strictHitRate"]), "primary"),
+    ):
+        parts.append('<div class="metric-card {0}"><span>{1}</span><strong>{2}</strong></div>'.format(
+            cls, _text(label), _text(value)))
+    parts.append("</div>")
+    parts.append('<p class="formula">{0}：{1} ÷ {2} = {3}。{4}</p>'.format(
+        _text("严格命中率"), _text(metrics["exactHits"]), _text(metrics["evaluable"]),
+        _text(_format_rate(metrics["strictHitRate"])), _text("已验证修改和无法核验项不进入分母。")))
+    if unclosed:
+        parts.append('<p class="closure-alert"><strong>{0}</strong>{1}</p>'.format(
+            _text("已称修复但实际未落实"), _text("：{0} 条，须优先回客户。".format(unclosed))))
+    parts.append('<h3>{0}</h3><ol class="review-file-list">'.format(_text("本次复核文件（按顺序）")))
+    for entry in files:
+        parts.append('<li><span class="order">{0}</span><strong>{1}</strong><span>{2}</span><span>{3}</span></li>'.format(
+            _text(entry.get("order")), _text(entry.get("displayName")), _text(entry.get("level")), _text(entry.get("version"))))
+    parts.append("</ol>")
+    seen_levels = []
+    for entry in files:
+        if entry.get("level") not in seen_levels:
+            seen_levels.append(entry.get("level"))
+    for level in seen_levels:
+        level_items = [item for item in items if item.get("reviewLevel") == level]
+        level_metrics = _review_metrics(level_items)
+        parts.append('<section class="review-level"><h3>{0}</h3>'.format(
+            _text("{0}：{1} 条意见".format(level, len(level_items)))))
+        parts.append('<div class="level-summary">{0}</div>'.format("".join(
+            '<span><strong>{0}</strong>{1}</span>'.format(_text(label), _text(value))
+            for label, value in (
+                ("已验证修改 ", level_metrics["resolved"]), ("AI 精确命中 ", level_metrics["exactHits"]),
+                ("AI 部分命中 ", level_metrics["partialHits"]), ("AI 未命中 ", level_metrics["misses"]),
+                ("严格命中率 ", _format_rate(level_metrics["strictHitRate"])),
+            )
+        )))
+        parts.append('<details class="review-details"><summary>{0}</summary>'.format(
+            _text("展开{0}意见（共 {1} 条）".format(level, len(level_items)))))
+        parts.extend(_review_item_card(item) for item in level_items)
+        parts.append("</details></section>")
+    parts.append("</section>")
+    return "".join(parts)
 
 
 def _not_checked_item(item) -> str:
@@ -1363,10 +1580,10 @@ def _external_data_checks_section(verification):
         parts.append('<p class="empty">{0}</p>'.format(_text(EXT_DATA_NO_CHECK_TEXT)))
         return "".join(parts)
 
-    header = ["编号", "数据项", "报告值", "数据源", "取值", "口径", "基准日", "出入较大", "判定", "说明"]
+    header = ["编号", "数据项", "报告值", "报告位置", "数据源", "外部取值", "取值时点", "口径", "差异说明", "判定", "说明"]
     parts.append(
-        "<table><thead><tr>{0}</tr></thead><tbody>".format(
-            "".join("<th>{0}</th>".format(_text(cell)) for cell in header)
+        '<div class="table-scroll"><table><thead><tr>{0}</tr></thead><tbody>'.format(
+            "".join('<th scope="col">{0}</th>'.format(_text(cell)) for cell in header)
         )
     )
     for check in checks:
@@ -1375,8 +1592,13 @@ def _external_data_checks_section(verification):
         if not _is_nonempty_str(deviation) or str(deviation).strip() == "—":
             # 归一化："未检查"的项一律显示"未取数"，不得与"无出入"共用 — 号
             deviation = EXT_DATA_NOT_FETCHED_TEXT if check.get("decision") == "未检查" else "—"
+        evidence = check.get("reportEvidence") or {}
         tail = [
-            _text(base_date),
+            _text(item) for item in (
+                evidence.get("locator") or "未提供",
+            )
+        ]
+        end_cells = [
             _text(deviation),
             _text(check.get("decision")),
             _text(check.get("note")),
@@ -1390,19 +1612,21 @@ def _external_data_checks_section(verification):
                 _text(check.get("checkId")),
                 _text(check.get("metric")),
                 _text(check.get("reportValue")),
+                tail[0],
                 _text(item.get("source")),
                 value_cell,
-                _text(item.get("caliber") or item.get("asOfDate") or ""),
-            ] + tail
+                _text(item.get("asOfDate") or base_date or ""),
+                _text(item.get("caliber") or ""),
+            ] + end_cells
             parts.append("<tr>{0}</tr>".format("".join("<td>{0}</td>".format(cell) for cell in cells)))
-    parts.append("</tbody></table>")
+    parts.append("</tbody></table></div>")
     return "".join(parts)
 
 
 def _external_data_section(verification) -> str:
     """《外部数据核验》区：取数路径兜底声明 + 数据源可用性 + 逐项核验（正确/不正确都入表）。"""
     parts = ['<section id="external-data-verification">']
-    parts.append("<h2>{0}</h2>".format(_text("外部数据核验")))
+    parts.append("<h2>{0}</h2>".format(_text("AI 外部数据核验结果")))
     if not isinstance(verification, dict) or not verification:
         parts.append('<p class="empty">{0}</p>'.format(_text(EXT_DATA_EMPTY_TEXT)))
         parts.append("</section>")
@@ -1453,7 +1677,7 @@ def _summary_breakdown_section(rendered_result) -> str:
             row = stats[module]
             parts.append(
                 "<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td></tr>".format(
-                    _text(module), _text(row["total"]), _text(row["high"]),
+                    _text(MODULE_LABEL.get(module, module)), _text(row["total"]), _text(row["high"]),
                     _text(row["medium"]), _text(row["low"]),
                 )
             )
@@ -1560,9 +1784,17 @@ def render(result: dict, print_trail: bool = None) -> str:
     parts = []
     parts.append('<main id="audit-report">')
 
-    # 01 项目信息
+    review_items = comparison.get("reviewItems") or []
+    review_metrics = _review_metrics(review_items)
+    unresolved_claims = sum(item.get("inFileResolution") == "L-unclosed" for item in review_items)
+    report_title = "中瑞世联AI审核报告 - {0}".format(audit_task.get("projectId"))
+
+    # 01 AI 审核综合总结 + 紧凑项目信息
     parts.append('<header id="project-info">')
-    parts.append("<h1>{0}</h1>".format(_text("审核意见")))
+    parts.append("<h1>{0}</h1>".format(_text(report_title)))
+    parts.append('<p class="project-line"><strong>{0}</strong><span>{1}</span><span>{2}</span><span>{3}</span></p>'.format(
+        _text(audit_task.get("projectId")), _text(audit_task.get("reportVersion")),
+        _text(((audit_task.get("profile") or {}).get("objectType"))), _text(_dt(audit_task.get("auditTime", "")))))
     parts.append(
         '<p class="badge">{0}</p>'.format(
             _span(
@@ -1574,10 +1806,11 @@ def render(result: dict, print_trail: bool = None) -> str:
         )
     )
     parts.append(
-        '<table class="kv">{0}</table>'.format(
+        '<details class="project-details"><summary>{0}</summary><table class="kv">{1}</table></details>'.format(
+            _text("查看完整项目信息"),
             _rows(
                 [
-                    ("项目编号", audit_task.get("projectId")),
+                    ("报告流水号ID", audit_task.get("projectId")),
                     ("报告版本", audit_task.get("reportVersion")),
                     ("审核时间", _dt(audit_task.get("auditTime", ""))),
                     ("对象类型", ((audit_task.get("profile") or {}).get("objectType"))),
@@ -1593,30 +1826,27 @@ def render(result: dict, print_trail: bool = None) -> str:
 
     # 02 审核结果概览
     parts.append('<section id="summary">')
-    parts.append("<h2>{0}</h2>".format(_text("审核结果概览")))
+    parts.append("<h2>{0}</h2>".format(_text("本次 AI 审核结论")))
     parts.append('<p class="banner">{0}</p>'.format(_text(OVERALL_LABEL.get(summary.get("overallDecision"), summary.get("overallDecision")))))
     parts.append('<p>{0}</p>'.format(_span("narrative", summary.get("narrative"))))
-    parts.append(
-        '<table class="kv">{0}</table>'.format(
-            _rows(
-                [
-                    ("问题总数", counts.get("issuesTotal")),
-                    ("高", counts.get("high")),
-                    ("中", counts.get("medium")),
-                    ("低", counts.get("low")),
-                    ("不通过", counts.get("fail")),
-                    ("待人工确认", counts.get("pendingConfirmation")),
-                    ("未检查项", counts.get("notChecked")),
-                ]
-            )
-        )
-    )
-    parts.append(_summary_breakdown_section(rendered_result))
+    parts.append('<div class="summary-kpis">')
+    for label, value, cls in (
+        ("AI 检出问题", counts.get("issuesTotal"), "danger"),
+        ("待人工确认", counts.get("pendingConfirmation"), "warning"),
+        ("未检查项", counts.get("notChecked"), "neutral"),
+        ("严格命中率", _format_rate(review_metrics["strictHitRate"]) if review_items else "数据不足", "primary"),
+        ("实际未落实", unresolved_claims, "danger"),
+    ):
+        parts.append('<div class="metric-card {0}"><span>{1}</span><strong>{2}</strong></div>'.format(
+            cls, _text(label), _text(value)))
+    parts.append("</div>")
+    parts.append('<details class="summary-details"><summary>{0}</summary>{1}</details>'.format(
+        _text("展开问题分布与核验概览"), _summary_breakdown_section(rendered_result)))
     parts.append("</section>")
 
     # 03 需要处理的问题
     parts.append('<section id="actionable-issues">')
-    parts.append("<h2>{0}</h2>".format(_text("需要处理的问题")))
+    parts.append("<h2>{0}</h2>".format(_text("AI 检出的问题项")))
     if sorted_issues:
         for issue in sorted_issues:
             parts.append(_issue_card(issue))
@@ -1624,77 +1854,45 @@ def render(result: dict, print_trail: bool = None) -> str:
         parts.append('<p class="empty">{0}</p>'.format(_text(EMPTY_TEXT)))
     parts.append("</section>")
 
-    # 04 需要人工确认事项
+    # 04 AI 外部数据核验
+    parts.append(_external_data_section(rendered_result.get("externalDataVerification")))
+
+    # 05 人工复核对照
+    parts.append(_review_comparison_section(comparison))
+
+    # 06 AI 审核表现评分卡（按明细重算）
+    parts.append(_scorecard_section(comparison, result.get("selfAuditErrors") or []))
+
+    # 07 需要人工确认事项
     parts.append('<section id="manual-confirmation-items">')
     parts.append("<h2>{0}</h2>".format(_text("需要人工确认事项")))
     parts.append(_list_block(manual_items, _manual_item, empty_text=EMPTY_TEXT))
     parts.append("</section>")
 
-    # 05 本次审核依据
+    # 08 本次审核依据（默认收起）
     parts.append('<section id="audit-basis">')
     parts.append("<h2>{0}</h2>".format(_text("本次审核依据")))
+    parts.append('<details class="audit-basis-details"><summary>{0}</summary>'.format(
+        _text("展开全部审核依据（共 {0} 条规则）".format(len(rules)))))
     parts.append(_rule_map(rules))
-    parts.append('<table><thead><tr><th>{0}</th><th>{1}</th><th>{2}</th><th>{3}</th><th>{4}</th><th>{5}</th><th>{6}</th></tr></thead><tbody>'.format(
-        _text("规则编号"), _text("权威层级"), _text("来源分类"), _text("名称"), _text("版本"), _text("条款"), _text("引用次数")))
+    parts.append('<div class="table-scroll"><table><thead><tr>' + "".join(
+        '<th scope="col">{0}</th>'.format(_text(label))
+        for label in ("规则编号", "权威层级", "来源分类", "名称", "版本", "条款", "引用次数")
+    ) + '</tr></thead><tbody>')
     for rule in sorted(rules, key=lambda item: str(item.get("ruleId"))):
-        parts.append(
-            "<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td><td>{6}</td></tr>".format(
-                _text(rule.get("ruleId")),
-                _text(AUTHORITY_LABEL.get(rule.get("authorityClass"), rule.get("authorityClass"))),
-                _text(SOURCE_TYPE_LABEL.get(rule.get("sourceType"), rule.get("sourceType"))),
-                _text(rule.get("title")),
-                _text(rule.get("version")),
-                _text(rule.get("clause")),
-                _text(rule.get("usageCount")),
-            )
-        )
-    parts.append("</tbody></table>")
+        parts.append("<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td><td>{6}</td></tr>".format(
+            _text(rule.get("ruleId")), _text(AUTHORITY_LABEL.get(rule.get("authorityClass"), rule.get("authorityClass"))),
+            _text(SOURCE_TYPE_LABEL.get(rule.get("sourceType"), rule.get("sourceType"))), _text(rule.get("title")),
+            _text(rule.get("version")), _text(rule.get("clause")), _text(rule.get("usageCount"))))
+    parts.append("</tbody></table></div>")
     kb_files = audit_basis.get("knowledgeBaseFiles") or []
     if kb_files:
-        parts.append("<h4>{0}</h4>".format(_text("本次知识库文件")))
-        parts.append(
-            "<ul>"
-            + "".join(
-                "<li>{0}{1}</li>".format(_span("kb-path", item.get("path") or item.get("kbRelativePath")), _span("exported-at", item.get("exportedAt")))
-                for item in kb_files
-            )
-            + "</ul>"
-        )
-    parts.append("</section>")
-
-    # 05.5 外部数据核验（基准日锚定 + 源可用性声明 + 逐项核验）
-    parts.append(_external_data_section(rendered_result.get("externalDataVerification")))
-
-    # 06 人工复核对照
-    parts.append('<section id="review-comparison">')
-    parts.append("<h2>{0}</h2>".format(_text("人工复核对照")))
-    parts.append(
-        '<table class="kv">{0}</table>'.format(
-            _rows(
-                [
-                    ("状态", REVIEW_STATUS_LABEL.get(comparison.get("status"), comparison.get("status"))),
-                    ("AI 与人工复核均发现", (comparison.get("bands") or {}).get("overlap")),
-                    ("仅 AI 发现", (comparison.get("bands") or {}).get("aiOnly")),
-                    ("结论或范围不同", (comparison.get("bands") or {}).get("divergent")),
-                    ("仅人工复核发现", (comparison.get("bands") or {}).get("reviewerOnly")),
-                    ("命中率", (comparison.get("metrics") or {}).get("aiHitRate")),
-                    ("分母口径", (comparison.get("metrics") or {}).get("denominator")),
-                    ("命中率（仅未落实）", (comparison.get("metrics") or {}).get("aiHitRateExclResolved")),
-                    ("分母口径（仅未落实）", (comparison.get("metrics") or {}).get("denominatorExclResolved")),
-                ]
-            )
-        )
-    )
-    reviewer_items = comparison.get("reviewerOnlyItems") or []
-    if comparison.get("status") == "performed":
-        parts.append("<h4>{0}</h4>".format(_text(REVIEWER_ONLY_LABEL)))
-        parts.append(_list_block(reviewer_items, _reviewer_only_item, empty_text=EMPTY_TEXT))
-    else:
-        parts.append('<p class="empty">{0}</p>'.format(_text(EMPTY_TEXT)))
-    parts.append("</section>")
-
-    # 06.5 AI 审核评分卡（自评；初审自评 → 复审补充与校正）
-    parts.append(_scorecard_section(result.get("aiScorecard") or {}, result.get("selfAuditErrors") or []))
+        parts.append("<h3>{0}</h3><ul>".format(_text("本次知识库文件")))
+        parts.extend("<li>{0}{1}</li>".format(
+            _span("kb-path", item.get("path") or item.get("kbRelativePath")),
+            _span("exported-at", item.get("exportedAt"))) for item in kb_files)
+        parts.append("</ul>")
+    parts.append("</details></section>")
 
     # 07 审核范围与未检查项
     parts.append('<section id="scope-and-not-checked">')
@@ -1707,7 +1905,7 @@ def render(result: dict, print_trail: bool = None) -> str:
     for item in scope.get("inputs") or []:
         parts.append(
             "<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>".format(
-                _text(item.get("displayName")), _text(item.get("version")), _text(item.get("readable"))
+                _text(item.get("displayName")), _text(item.get("version")), _readable_status(item.get("readable"))
             )
         )
     parts.append("</tbody></table>")
@@ -1790,7 +1988,7 @@ def render(result: dict, print_trail: bool = None) -> str:
     report_content = "\n".join(parts)
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     template_values = {
-        "document_title": _text("审核意见"),
+        "document_title": _text(report_title),
         "report_content": report_content,
         "embedded_json": payload,
     }
@@ -1859,7 +2057,7 @@ def _cmd_render(args) -> int:
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="CRWU AuditResult 校验与单文件 HTML 渲染（送达规范 v1.0）")
+    parser = argparse.ArgumentParser(description="CRWU AuditResult 校验与单文件 HTML 渲染（送达规范 v1.1）")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     validate_parser = subparsers.add_parser("validate", help="校验 AuditResult JSON")

@@ -3,7 +3,7 @@
 | 版本 | v1.0 | 状态 | 2026-09-09 定稿 | 维护 | `axis+label` 缺口与非审核提案唯一事实源 |
 | --- | --- | --- | --- | --- | --- |
 
-能力缺口按独立分类标签管理，不再按“形态×目的×对象×方法×场景”组合创建或注册技能。提案是建议和证据，不是审核结论，不修改任何文件。落地分工：诊断与根因分桶走 `crwu-audit-optimize`；**一级 Skill 的创建、改名、structure/一级根/registry/classification 改动由 `crwu-audit-skill-maintainer` 在用户确认后执行**（`create`/`repair`/`remap`）。
+能力缺口按独立分类标签管理，不再按“形态×目的×对象×方法×场景”组合创建或注册技能。提案是建议和证据，不是审核结论，不修改任何文件。落地分工：诊断与根因分桶走 `crwu-dev-audit-optimize`；**一级 Skill 的创建、改名、structure/一级根/registry/classification 改动由 `crwu-audit-skill-maintainer` 在用户确认后执行**（`create`/`repair`/`remap`）。
 
 ## 触发与持续执行
 
@@ -31,7 +31,7 @@
   "evidence": ["企业清算", "为破产清算提供价值参考"],
   "location": ["record.F0000064", "评估报告·摘要(L60-68)"],
   "impact": "清算业务专项能力未实现；非审核结论",
-  "next_action": "人工按已加载能力复核；根治走 crwu-audit-optimize，一级 Skill 落地走 crwu-audit-skill-maintainer"
+  "next_action": "人工按已加载能力复核；根治走 crwu-dev-audit-optimize，一级 Skill 落地走 crwu-audit-skill-maintainer"
 }
 ```
 

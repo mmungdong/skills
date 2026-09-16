@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "da7312db-b0a3-4dfd-958f-f4ab18e81b72",
+  "path": "crwu-audit-biz-consulting-review",
+  "path_key": "crwu-audit-biz-consulting-review",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-biz-consulting-review",
+    "branch": null
+  }
+}

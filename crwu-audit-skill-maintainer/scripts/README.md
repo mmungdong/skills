@@ -1,7 +1,7 @@
 # crwu-audit-skill-maintainer/scripts —— 审核技能引用与实时协议校验
 
 > 定位：审核技能族的**只读**静态校验工具（引用卫生 + 实时引用协议 lint）。
-> 本工具归口本技能，**随技能安装**（本目录即技能内 `scripts/`），被 `crwu-audit-optimize`、
+> 本工具归口本技能，**随技能安装**（本目录即技能内 `scripts/`），被 `crwu-dev-audit-optimize`、
 > `crwu-audit-datacheck` 等按「`crwu-audit-skill-maintainer` 技能的 `scripts/kb_tool.py`」引用。
 
 ## 为什么存在

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "909012a9-060d-4c4b-9799-40610ceb9d68",
+  "path": "crwu-audit-asset-equipment",
+  "path_key": "crwu-audit-asset-equipment",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-asset-equipment",
+    "branch": null
+  }
+}

@@ -56,6 +56,21 @@
 
 ## 3. 字段语义（不变量）
 
+- **`schema` 字面与必填键逐字固定，不得混名、不得缺键**（v0.6 起列为硬门禁）：
+  `目录快照.json` 的 `schema` 必须**逐字**写 `crwu.kb-catalog.snapshot.v1`；必填
+  `generated_at` / `profile` / `mode` / `space` / `stats` / `nodes` / `failures`，其中
+  `stats.complete` **必填**（缺席即无法判完整性）。
+  三个 schema 名字**不得互相混用**：快照 `crwu.kb-catalog.snapshot.v1`、
+  节点索引 `crwu.kb-dir-cache.nodeindex.v1`（`node-index.json`）、
+  缓存元数据 `crwu.kb-dir-cache.meta.v1`（`.cache-meta.json`）。
+  时间字段同理：快照用 `generated_at`，`.cache-meta.json` 用 `last_successful_at`，
+  **不得写成 `fetched_at`**（该名不是本域任何 schema 的字段）。
+  > 真实失效：实时缓存把 `node-index.json` 的**扁平节点形态**（节点自带 `path`）写进了
+  > `目录快照.json`，`schema` 字面写成 `crwu.kb-dir-cache.snapshot.v1`（由 meta 名与快照名
+  > 混合而成，本仓历史中从未存在），时间字段写 `fetched_at` 且缺 `profile`/`mode`/`stats.complete`；
+  > 后果是映射检查器直接拒收（`unsupported catalog schema`），整条映射校验链不可用。
+- **`nodes` 必须是嵌套 `children`**（前序展开序）：父节点内嵌 `children`，根层 `parentFolderId=null`。
+  扁平节点数组（每个节点自带完整 `path`）属 `node-index.json` 的形态，**禁止**写入 `目录快照.json`。
 - **名称不替代 ID**：所有在线操作只认 `nodeId`；`name` 仅展示与本地文件命名（M2）。
 - **type 只表示节点形态**：服务端 `nodeType` 取值 `folder|file`；文档一律 `file`，**不承载格式信息**，禁止用它推断是 adoc 还是原生文件。
 - **`extension` 是取数通道的唯一判据（v0.6 起强制记录）**：文档节点必须写服务端真实返回的 `extension`（`adoc`/`md`/`pdf`/`docx`/`xlsx`/`exe`…）与 `contentType`（`ALIDOC`/`OTHER`…）；缺失记 `null`，**不推断、不按名称后缀猜测**（节点名不带后缀，`.md` 只是导出后的本地文件名）。M2/M3 按它分流（SKILL.md §2/§6.2）：`adoc` → `doc +export`；`md`/`txt` → `drive +download`；其余 → `skipped`。
@@ -83,7 +98,7 @@
 
 ## 5. 摘要口径（聊天展示）
 
-- M1：`命中 <n> 库` → 每库一行：`<库名>（<spaceType>）workspaceId=<…>：节点 <total>/folder <folders>/深度 <max>，缓存 <绝对路径>（fetched_at=<…>）`；failures 非空附"部分失败"清单；`complete=false` 显式"目录未完整（缓存未更新）"。
+- M1：`命中 <n> 库` → 每库一行：`<库名>（<spaceType>）workspaceId=<…>：节点 <total>/folder <folders>/深度 <max>，缓存 <绝对路径>（generated_at=<…>）`；failures 非空附"部分失败"清单；`complete=false` 显式"目录未完整（缓存未更新）"。
 - M2：`knowledge/ 更新：成功 N / 跳过 S / 失败 F`，失败逐项一行；附本次清单类型（单文件/目录）与"清单外零下载"声明，并提示跨审核必须重新下载。
 - M3：见 references/02 §6 报告口径。
 - 全部产物给出绝对路径。

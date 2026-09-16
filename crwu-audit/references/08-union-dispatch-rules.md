@@ -13,7 +13,7 @@ asset_skills   = available_skills(asset_types[])
 business_skills = available_skills(business_types[])
 method_skills  = available_skills(methods[])
 overlay_skills = available_skills(overlays[])
-public_skills  = [crwu-audit-public-general-standards]        # 恒装配：报告披露 + 程序质控
+public_skills  = [crwu-dev-audit-public-general-standards]        # 恒装配：报告披露 + 程序质控
                + [crwu-audit-datacheck] when tabular materials exist
                + [crwu-audit-external-data] when methods include 收益法 or 市场法
 
@@ -78,7 +78,7 @@ skills_to_load = stable_unique(
 - `crwu-audit-asset-scrap-materials`：available，加载；
 - `crwu-audit-biz-transaction-disposal`：available，加载；
 - `crwu-audit-overlay-state-owned`：pending，记独立 gap；
-- `public_skills`：`crwu-audit-public-general-standards` **恒加入**（报告披露层与程序质控层对任何对象均适用），材料含表格再追加 `crwu-audit-datacheck`。
+- `public_skills`：`crwu-dev-audit-public-general-standards` **恒加入**（报告披露层与程序质控层对任何对象均适用），材料含表格再追加 `crwu-audit-datacheck`。
 
 即监管层专业能力缺失时，通用准则层与表格勾稽仍必须加载并产出结果；不得因为 `overlay` 标签 `pending` 而让 `public_skills` 空返。
 
@@ -88,4 +88,4 @@ skills_to_load = stable_unique(
 
 ### 收益法 / 市场法项目的外部数据核验
 
-画像命中 `methods=[收益法]`（或含 `市场法`）时，`public_skills` 在恒装配的 `crwu-audit-public-general-standards` 之外再并入 `crwu-audit-external-data`；是否真正取数由该能力按知识库 `M-外部数据核验` 表 A 三条（业务线 × 资产线 × 方法线）自行判定，缺一即记"不在本模块范围"，不作为未检查项。该能力的唯一数据源是**同花顺 iFinD**，取数路径随宿主而异（WorkBuddy 宿主连接器 / DeepSeek Harness 的 `ifind-finance-data` 技能），**不启用万得**；两条取数路径都不可用时按库内降级口径降级，并**必须在交付 HTML《外部数据核验》区显式声明**"未配置/未认证 同花顺 iFinD，相关条目未经外部数据核验"。所有取数以 `record_context.base_date` 为锚，禁止取数时点的滚动窗口。该能力只出外部数据核验意见，不下方法适用性与参数合理性判断。
+画像命中 `methods=[收益法]`（或含 `市场法`）时，`public_skills` 在恒装配的 `crwu-dev-audit-public-general-standards` 之外再并入 `crwu-audit-external-data`；是否真正取数由该能力按知识库 `M-外部数据核验` 表 A 三条（业务线 × 资产线 × 方法线）自行判定，缺一即记"不在本模块范围"，不作为未检查项。该能力的唯一数据源是**同花顺 iFinD**，取数路径随宿主而异（WorkBuddy 宿主连接器 / DeepSeek Harness 的 `ifind-finance-data` 技能），**不启用万得**；两条取数路径都不可用时按库内降级口径降级，并**必须在交付 HTML《外部数据核验》区显式声明**"未配置/未认证 同花顺 iFinD，相关条目未经外部数据核验"。所有取数以 `record_context.base_date` 为锚，禁止取数时点的滚动窗口。该能力只出外部数据核验意见，不下方法适用性与参数合理性判断。

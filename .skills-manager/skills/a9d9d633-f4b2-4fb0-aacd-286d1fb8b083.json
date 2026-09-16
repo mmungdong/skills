@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "a9d9d633-f4b2-4fb0-aacd-286d1fb8b083",
+  "path": "crwu-audit-asset-enterprise-value",
+  "path_key": "crwu-audit-asset-enterprise-value",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-asset-enterprise-value",
+    "branch": null
+  }
+}

@@ -21,7 +21,7 @@ description: >-
 
 - **触发**：初始化 crwu 环境、安装/部署/分发 crwu skills、更新/同步 crwu skills、
   把 crwu skills 装到某个 agent。
-- **不触发**：跑 `crwu-audit*` 审核、`crwu-dws` 钉钉知识库、`h3yun-*` 氚云等业务
+- **不触发**：跑 `crwu-audit*` 审核、`crwu-dws` 钉钉知识库、`crwu-h3yun-*` 氚云等业务
   （这些是别的技能）；也不负责 `crwu` CLI 二进制本身的编译/安装。
 
 ## 1. 确定目标 agent

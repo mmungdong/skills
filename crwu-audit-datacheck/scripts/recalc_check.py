@@ -263,7 +263,15 @@ class Evaluator:
 
         def ev(arg):
             s, e = arg
-            return self._expr(tokens, s)[0]
+            value, nxt = self._expr(tokens, s)
+            if nxt != e:
+                # 参数范围内有未消费的 token（未实现的运算符如 `&`/`%`、语法错误）→ 必须报「未重算」。
+                # 早期实现直接 `self._expr(tokens, s)[0]` **丢弃了消费位置**，于是
+                # `IF(A1&B1="x", a, b)` 只解析了 `A1`、`&B1="x"` 被静默忽略，条件走错分支，
+                # 引擎给出一个**自信的错误值**并按"已重算"参与比对
+                # （2026-302150-LX9757-BG8677 实测：3,462 条差异中 1,914 条由此产生，属假差异）。
+                raise Unavailable("解析失败：函数参数存在未消费的片段 " + str(tokens[nxt:e]))
+            return value
 
         if name == "IF":
             if len(args) not in (2, 3):

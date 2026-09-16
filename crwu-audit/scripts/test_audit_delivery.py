@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AuditResult 校验与 HTML 渲染的契约测试（送达规范 v1.0）。
+"""AuditResult 校验与 HTML 渲染的契约测试（送达规范 v1.1）。
 
 运行：在技能目录内 `python3 scripts/test_audit_delivery.py`
 本测试**自洽**：只依赖本技能 `scripts/` 内的脚本、schema 与样例，可随技能一起安装。
@@ -31,11 +31,11 @@ REGION_ORDER = [
     "project-info",
     "summary",
     "actionable-issues",
-    "manual-confirmation-items",
-    "audit-basis",
     "external-data-verification",
     "review-comparison",
     "ai-scorecard",
+    "manual-confirmation-items",
+    "audit-basis",
     "scope-and-not-checked",
     "professional-trail",
     "file-trace",
@@ -45,6 +45,120 @@ REGION_ORDER = [
 def load_sample() -> dict:
     with SAMPLE_PATH.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def with_structured_review_comparison() -> dict:
+    """构造新版逐条复核事实源；统计应全部能从 reviewItems 重算。"""
+    result = load_sample()
+    comparison = result["reviewComparison"]
+    comparison["reviewFiles"] = [
+        {
+            "order": 1,
+            "level": "一级复核",
+            "displayName": "01-一级复核意见.docx",
+            "version": "v1",
+        },
+        {
+            "order": 2,
+            "level": "二级复核",
+            "displayName": "02-二级复核意见.docx",
+            "version": "v2",
+        },
+    ]
+    comparison["reviewItems"] = [
+        {
+            "itemId": "RV-001",
+            "title": "报告结论与测算表不一致",
+            "module": "数据勾稽",
+            "reviewLevel": "一级复核",
+            "matchStatus": "exact",
+            "linkedIssueIds": ["ISS-DC-003"],
+            "reviewerEvidence": {
+                "file": "01-一级复核意见.docx",
+                "locator": "第1条",
+                "quote": "报告结论与测算表不一致。",
+            },
+            "inFileResolution": "L-open",
+            "inFileEvidence": {
+                "file": "报告-复审版.docx",
+                "locator": "第12页",
+                "quote": "结论仍为1,244.00。",
+            },
+            "handling": "继续修改",
+        },
+        {
+            "itemId": "RV-002",
+            "title": "披露文字已补充",
+            "module": "报告披露",
+            "reviewLevel": "一级复核",
+            "matchStatus": "miss",
+            "linkedIssueIds": [],
+            "reviewerEvidence": {
+                "file": "01-一级复核意见.docx",
+                "locator": "第2条",
+                "quote": "补充评估范围说明。",
+            },
+            "inFileResolution": "L-resolved",
+            "inFileEvidence": {
+                "file": "报告-复审版.docx",
+                "locator": "第5页",
+                "quote": "已补充完整。",
+            },
+            "handling": "无需继续处理",
+        },
+        {
+            "itemId": "RV-003",
+            "title": "答复称已修复但仍未落实",
+            "module": "市场法",
+            "reviewLevel": "二级复核",
+            "matchStatus": "miss",
+            "linkedIssueIds": [],
+            "reviewerEvidence": {
+                "file": "02-二级复核意见.docx",
+                "locator": "第1条",
+                "quote": "补充时间修正依据。",
+            },
+            "inFileResolution": "L-unclosed",
+            "inFileEvidence": {
+                "file": "评估说明-复审版.docx",
+                "locator": "市场法章节",
+                "quote": "仍未见时间修正依据。",
+            },
+            "closureEvidence": {
+                "file": "项目答复.docx",
+                "locator": "答复1",
+                "quote": "已补充。",
+            },
+            "handling": "优先回客户",
+        },
+        {
+            "itemId": "RV-004",
+            "title": "扫描件内容无法核验",
+            "module": "市场法",
+            "reviewLevel": "二级复核",
+            "matchStatus": "partial",
+            "linkedIssueIds": ["ISS-MKT-007"],
+            "reviewerEvidence": {
+                "file": "02-二级复核意见.docx",
+                "locator": "第2条",
+                "quote": "核验扫描件附件。",
+            },
+            "inFileResolution": "L-uncheckable",
+            "handling": "补充可读文件",
+        },
+    ]
+    comparison["metrics"] = {
+        "total": 4,
+        "resolved": 1,
+        "uncheckable": 1,
+        "evaluable": 2,
+        "exactHits": 1,
+        "partialHits": 0,
+        "misses": 1,
+        "strictHitRate": 50.0,
+        "coverageRate": 50.0,
+    }
+    return result
 
 
 def module_string_constants() -> set:
@@ -267,12 +381,54 @@ class AuditResultRenderTest(unittest.TestCase):
         self.assertIn("thead { display: table-header-group; }", self.document)
         for issue in self.result["issues"]:
             label = delivery.SEVERITY_LABEL[issue["severity"]]
-            self.assertIn('<span class="severity-label">{0}</span>'.format(label), self.document)
+            self.assertIn('severity-label">严重程度：{0}</span>'.format(label), self.document)
         for severity in delivery.SEVERITY_CLASS.values():
             self.assertIn(severity, self.document)
 
+    def test_severity_palette_is_professional_and_not_full_card_tinted(self):
+        template = TEMPLATE_PATH.read_text(encoding="utf-8")
+        for color in ("#c2413b", "#b86b12", "#287596"):
+            self.assertIn(color, template.lower())
+        self.assertIn(".issue-card.sev-high { border-left-color: var(--high); }", template)
+        self.assertNotIn("linear-gradient(90deg, var(--high-soft)", template)
+
     def test_professional_trail_folded_by_default(self):
         self.assertIn('<details id="professional-trail">', self.document)
+
+    def test_scope_readability_uses_clear_icons_instead_of_booleans(self):
+        start = self.document.find('id="scope-and-not-checked"')
+        end = self.document.find('</section>', start)
+        scope = self.document[start:end]
+        self.assertIn('class="readable-status is-readable"', scope)
+        self.assertIn('aria-label="可读">✅</span>', scope)
+        self.assertIn('class="readable-status is-unreadable"', scope)
+        self.assertIn('aria-label="不可读">❌</span>', scope)
+        self.assertNotIn(">True<", scope)
+        self.assertNotIn(">False<", scope)
+
+    def test_header_leads_with_ai_audit_summary_and_compact_metrics(self):
+        document = delivery.render(with_structured_review_comparison())
+        expected_title = "中瑞世联AI审核报告 - PRJ-2026-0001"
+        self.assertIn("<title>{0}</title>".format(expected_title), document)
+        self.assertIn("<h1>{0}</h1>".format(expected_title), document)
+        for label in ("AI 检出问题", "待人工确认", "未检查项", "严格命中率", "实际未落实"):
+            self.assertIn(label, document)
+
+    def test_issue_reasoning_is_folded_behind_explicit_control(self):
+        document = delivery.render(with_structured_review_comparison())
+        self.assertIn('class="issue-evidence"', document)
+        self.assertIn("展开判断依据与规则", document)
+        self.assertIn("问题方向：数据勾稽", document)
+        first_issue = document[document.find('class="issue-card'):document.find('class="issue-card', document.find('class="issue-card') + 1)]
+        self.assertLess(first_issue.find("问题描述"), first_issue.find("展开判断依据与规则"))
+
+    def test_recommended_edits_are_folded_behind_explicit_counted_control(self):
+        document = delivery.render(with_structured_review_comparison())
+        self.assertIn('class="issue-edits"', document)
+        self.assertIn("展开修改意见（共 1 项）", document)
+        first_issue = document[document.find('class="issue-card'):document.find('class="issue-card', document.find('class="issue-card') + 1)]
+        self.assertLess(first_issue.find("问题描述"), first_issue.find("展开修改意见（共 1 项）"))
+        self.assertLess(first_issue.find("展开修改意见（共 1 项）"), first_issue.find("建议修改"))
 
     def test_embedded_json_matches_digests(self):
         match = re.search(
@@ -349,11 +505,28 @@ class AuditResultRenderTest(unittest.TestCase):
                     collect(item)
 
         collect(self.result)
+        allowed.add("中瑞世联AI审核报告 - {0}".format(self.result["auditTask"]["projectId"]))
+        allowed.update({"✅", "❌"})
         for node in text_nodes(self.document):
             if re.fullmatch(r"[0-9a-f]{64}", node):
                 continue  # 渲染期计算的来源/嵌入摘要，可由输入确定性重算
             if re.fullmatch(r"[0-9]+", node):
                 continue  # 渲染期按输入确定性重算的计数（如概览分区项数），非业务句子
+            if any(re.fullmatch(pattern, node) for pattern in (
+                r"(问题方向|严重程度|问题类型|判定)：.+",
+                r"展开修改意见（共 [0-9]+ 项）",
+                r"展开判断依据与规则（[0-9]+ 条规则，[0-9]+ 条材料）",
+                r"展开全部审核依据（共 [0-9]+ 条规则）",
+                r"展开 AI 自查错误记录（共 [0-9]+ 条）",
+                r".+复核：[0-9]+ 条意见",
+                r"展开.+复核意见（共 [0-9]+ 条）",
+                r"：[0-9]+ 条，须优先回客户。",
+                r"严格命中率：[0-9]+ ÷ [0-9]+ = [0-9]+(?:\.[0-9])?%。已验证修改和无法核验项不进入分母。",
+                r"严格命中率：[0-9]+ ÷ [0-9]+；覆盖率：\([0-9]+ \+ [0-9]+\) ÷ [0-9]+。已验证修改和无法核验项不进入分母；综合值按全部有效明细汇总，不取各维度百分比平均。",
+                r"[0-9]+(?:\.[0-9])?%",
+                r"[0-9]+ ÷ [0-9]+",
+            )):
+                continue  # 受控标签与输入计数/枚举的确定性组合，不创作新的业务结论
             self.assertIn(node, allowed, "渲染器生成了非标签/非数据的文本：{0}".format(node))
 
 
@@ -370,6 +543,12 @@ class ExternalDataVerificationTest(unittest.TestCase):
             self.document.find('id="{0}"'.format(region)) for region in REGION_ORDER
         ]
         self.assertEqual(sorted(positions), positions, "外部数据核验区顺序必须符合 §3 交付结构")
+
+    def test_external_data_is_named_as_ai_result_and_follows_ai_issues(self):
+        document = delivery.render(with_structured_review_comparison())
+        self.assertIn("AI 外部数据核验结果", document)
+        self.assertLess(document.find('id="actionable-issues"'), document.find('id="external-data-verification"'))
+        self.assertLess(document.find('id="external-data-verification"'), document.find('id="review-comparison"'))
 
     def test_unavailable_source_is_declared_in_html(self):
         result = load_sample()
@@ -396,7 +575,7 @@ class ExternalDataVerificationTest(unittest.TestCase):
         end = self.document.find("</section>", start)
         summary = self.document[start:end]
         self.assertIn("问题按模块分布", summary)
-        self.assertIn("marketApproach", summary, "按模块分布须列出问题所属模块")
+        self.assertIn("市场法", summary, "按模块分布须使用员工可读的问题方向")
         self.assertIn("外部数据核验结果", summary, "外部数据核验须在概览中单独成块")
         self.assertIn("与哪一数据源出入较大", summary, "须给出与哪一源出入较大的分布")
         self.assertNotIn("external-data-verification", summary, "概览只做分区呈现，明细仍在专区内")
@@ -575,6 +754,55 @@ class ReviewerOnlyInFileResolutionTest(unittest.TestCase):
         self.assertFalse(any("denominator" in e for e in delivery.validate(r)), delivery.validate(r))
 
 
+class StructuredReviewComparisonTest(unittest.TestCase):
+    """新版逐条复核事实源：文件顺序、分级明细与百分比必须可重算。"""
+
+    def test_structured_sample_is_valid(self):
+        self.assertEqual([], delivery.validate(with_structured_review_comparison()))
+
+    def test_metrics_are_recomputed_from_review_items(self):
+        result = with_structured_review_comparison()
+        result["reviewComparison"]["metrics"]["strictHitRate"] = 99.0
+        errors = delivery.validate(result)
+        self.assertTrue(any("strictHitRate" in error and "重算" in error for error in errors), errors)
+
+    def test_resolved_and_uncheckable_are_excluded_from_denominator(self):
+        result = with_structured_review_comparison()
+        document = delivery.render(result)
+        self.assertIn("50.0%", document)
+        self.assertIn("1 ÷ 2", document)
+        self.assertIn("已验证修改", document)
+        self.assertIn("无法核验", document)
+
+    def test_review_files_are_listed_in_declared_order(self):
+        document = delivery.render(with_structured_review_comparison())
+        first = document.find("01-一级复核意见.docx")
+        second = document.find("02-二级复核意见.docx")
+        self.assertGreaterEqual(first, 0)
+        self.assertGreater(second, first)
+
+    def test_each_review_level_has_visible_summary_and_explicit_expand_control(self):
+        document = delivery.render(with_structured_review_comparison())
+        self.assertIn("一级复核：2 条意见", document)
+        self.assertIn("二级复核：2 条意见", document)
+        self.assertIn("展开一级复核意见（共 2 条）", document)
+        self.assertIn("展开二级复核意见（共 2 条）", document)
+
+    def test_unclosed_claim_is_prominent_with_both_evidence_sides(self):
+        document = delivery.render(with_structured_review_comparison())
+        self.assertIn("已称修复但实际未落实", document)
+        self.assertIn("项目答复.docx", document)
+        self.assertIn("仍未见时间修正依据", document)
+
+    def test_objective_scorecard_shows_review_level_module_and_weighted_total(self):
+        document = delivery.render(with_structured_review_comparison())
+        self.assertIn("AI 审核表现评分卡", document)
+        self.assertIn("按复核级次", document)
+        self.assertIn("按问题模块", document)
+        self.assertIn("综合严格命中率", document)
+        self.assertNotIn("综合·AI 单机", document)
+
+
 
 class AiScorecardTest(unittest.TestCase):
     """AI 审核评分卡（自评六维 + 复审校正 + 审核错误项）的校验契约。"""
@@ -644,11 +872,24 @@ class AiScorecardTest(unittest.TestCase):
         self.assertTrue(any("kind 取值非法" in e for e in errors))
         self.assertTrue(any("errorId 重复" in e for e in errors))
 
+    def test_closed_false_positive_cannot_still_be_an_active_issue(self):
+        r = load_sample()
+        r["selfAuditErrors"][0] = {
+            "errorId": "SAE-001",
+            "kind": "false_positive",
+            "discoveredAt": "复审",
+            "description": "复审确认该条属于误报并已撤回",
+            "correction": "撤回该条",
+            "status": "closed",
+            "issueId": r["issues"][0]["issueId"],
+        }
+        self.assertTrue(any("已关闭假阳性不得仍保留在 issues" in e for e in delivery.validate(r)))
+
     def test_scorecard_renders_as_tables(self):
-        html = delivery.render(load_sample())
+        html = delivery.render(with_structured_review_comparison())
         self.assertIn('id="ai-scorecard"', html)
-        for label in ("本次 AI 审核六维评分卡", "初审分", "复审校正", "最终分",
-                      "综合·AI 单机", "综合·含人机复核闭环", "AI 审核错误项"):
+        for label in ("AI 审核表现评分卡", "综合严格命中率", "综合覆盖率",
+                      "按复核级次", "按问题模块", "展开 AI 自查错误记录"):
             self.assertIn(label, html)
 
 

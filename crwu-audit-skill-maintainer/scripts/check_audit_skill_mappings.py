@@ -24,6 +24,13 @@ KB_NODE_INDEX_SCHEMA = "crwu.kb-node-index.v1"
 # Older nested/legacy shapes kept accepted so existing fixtures and snapshots still load.
 SNAPSHOT_SCHEMA = "crwu.kb-catalog.snapshot.v1"
 NODE_INDEX_SCHEMA = "crwu.kb-dir-cache.nodeindex.v1"
+# 明确列出可接受集合：错误信息要能告诉人"该改什么"，只报 schema 名不够
+# （真实失效：实时缓存把 node-index 形态写进 目录快照.json，并把 schema 字面写成
+#  `crwu.kb-dir-cache.snapshot.v1`——与 .cache-meta.json 的 `crwu.kb-dir-cache.meta.v1`
+#  混合而成，历史上从未存在过这个名字。不得为它开别名，否则等于把漂移固化成契约。
+ACCEPTED_CATALOG_SCHEMAS = (
+    DIR_SNAPSHOT_SCHEMA, KB_NODE_INDEX_SCHEMA, SNAPSHOT_SCHEMA, NODE_INDEX_SCHEMA,
+)
 REQUIRED_REFERENCES = (
     "00-applicability.md",
     "01-kb-assembly.md",
@@ -70,13 +77,16 @@ LEAF_OWNED_REFERENCES = ("00-applicability.md", "01-kb-assembly.md", "02-review-
 AXIS_DISPATCH_INPUT = {"asset": "asset_skills", "business": "business_skills"}
 # Concrete skill names only: excludes wildcards (crwu-audit-asset-*) and placeholders
 # (crwu-audit-<axis>-<label>) and longer identifiers such as design-crwu-audit-skills.md.
-_SKILL_TOKEN_RE = re.compile(r"(?<![a-z0-9-])crwu-audit-[a-z0-9][a-z0-9-]*(?![a-z0-9*<-])")
+# 两组前缀都认：审核族 `crwu-audit-*` 与开发/维护侧 `crwu-dev-audit-*`
+# （2026-09-16 改名：optimize / public-general-standards 移至 crwu-dev-audit-；
+#  若只认前者，路由正文里这两个名字会连 token 都提不出来 → R4 静默漏检）。
+_SKILL_TOKEN_RE = re.compile(r"(?<![a-z0-9-])crwu-(?:dev-)?audit-[a-z0-9][a-z0-9-]*(?![a-z0-9*<-])")
 _REFERENCE_TOKEN_RE = re.compile(r"(?<![0-9a-z-])(\d\d-[a-z0-9-]+\.md)")
 # Skills that are deliberately not axis leaves (router, maintainers, cross-axis
 # capabilities), so they are exempt from the asset/biz leaf naming rule.
 NON_LEAF_SKILLS = {
     "crwu-audit",
-    "crwu-audit-optimize",
+    "crwu-dev-audit-optimize",
     "crwu-audit-skill-maintainer",
     "crwu-audit-datacheck",
 }
@@ -150,8 +160,46 @@ SLASH_TREE_LINE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>[/-])\s+(?P<name>\S
 
 
 def _parse_markdown_tree(text: str) -> tuple[str, ...]:
-    """A pasted directory tree, in either published form (icon tree first, then slash tree)."""
-    return _parse_icon_tree(text) or _parse_slash_tree(text)
+    """A pasted directory tree, in any published form.
+
+    Order: icon tree (`- 📁 name`) → slash tree (`/ <folder>` / `- <doc>`) → box tree
+    (`├─ name/ [F]`, the form `crwu-dws/references/00` §4 actually prescribes for
+    `目录树.md`). The box form used to be unparseable, so the mandated artifact could not
+    be used as a `--catalog` input at all.
+    """
+    return _parse_icon_tree(text) or _parse_slash_tree(text) or _parse_box_tree(text)
+
+
+BOX_TREE_LINE = re.compile(r"^(?P<prefix>(?:[│ ]{3})*)(?P<branch>├─|└─) (?P<rest>.+?)\s*$")
+
+
+def _parse_box_tree(text: str) -> tuple[str, ...]:
+    """`crwu-dws/references/00` §4 规定的 `目录树.md`：`├─`/`└─`，每级缩进 3 字符
+    （`│  ` 或 `   `）；folder 行尾 `[F]`，文档行尾为 `extension`（`ext:未提供` 表缺席）。
+    """
+    paths: set[str] = set()
+    folders: list[str] = []
+    for line in text.splitlines():
+        match = BOX_TREE_LINE.match(line)
+        if not match:
+            continue
+        level = len(match.group("prefix")) // 3
+        rest = match.group("rest").strip()
+        is_folder = rest.endswith("[F]")
+        if is_folder:
+            name = rest[: -len("[F]")].strip().rstrip("/").strip()
+        else:
+            # 文档名与行尾 extension 之间由多个空格分隔；名称本身可含单空格
+            name = re.split(r"\s{2,}", rest)[0].strip().rstrip("/")
+        if not name:
+            continue
+        folders = folders[:level]
+        normalized = _normalize_path("/".join([*folders, name]), folder=is_folder)
+        if normalized:
+            paths.add(normalized)
+        if is_folder:
+            folders.append(name)
+    return tuple(sorted(paths))
 
 
 def _parse_icon_tree(text: str) -> tuple[str, ...]:
@@ -414,7 +462,14 @@ def load_catalog(path: Path) -> Catalog:
             _snapshot_is_complete(data),
             tuple(sorted(set(_paths_from_node_index(data)))),
         )
-    raise ValueError(f"unsupported catalog schema: {schema!r}")
+    raise ValueError(
+        f"unsupported catalog schema: {schema!r}; accepted: "
+        + ", ".join(repr(s) for s in ACCEPTED_CATALOG_SCHEMAS)
+        + f". If this file is a crwu-dws directory cache, rebuild it with crwu-dws M1: "
+          f"the snapshot schema literal must be exactly {SNAPSHOT_SCHEMA!r}, carry "
+          f"generated_at/profile/mode and stats.complete, and use **nested `children`** nodes "
+          f"(a flat node list carrying its own `path` is the node-index shape, not the snapshot)."
+    )
 
 
 def _table_cells(line: str) -> tuple[str, ...] | None:
@@ -542,7 +597,10 @@ def _declared_first_level_roots(text: str) -> set[str]:
 _BACKTICKED_RE = re.compile(r"`([^`\n]+)`")
 # Placeholders / globs / ellipses are examples, not addressing keys.
 _PATH_PLACEHOLDER_RE = re.compile(r"[…*<>]|某|示例|待建|不存在|省略")
-AUDIT_FAMILY_PREFIX = "crwu-audit"
+# 审核族目录前缀（含开发/维护侧 `crwu-dev-audit-*`）：装配路径键、frontmatter 名与
+# "真实存在的技能目录"解析都按这两组前缀收集——只认 `crwu-audit` 会让改到 dev 前缀的
+# 技能静默掉出扫描范围（2026-09-16 改名时同步修正）。
+AUDIT_FAMILY_PREFIX = ("crwu-audit", "crwu-dev-audit")
 
 
 def _catalog_top_levels(paths: set[str]) -> dict[str, str]:
@@ -823,14 +881,15 @@ def inspect_routing_layer(
             )
 
     # R4: every concrete skill name the routing layer names must exist or be registered.
-    # Resolution covers any real crwu-audit* directory (leaves *and* non-leaf skills such
-    # as the optimizer or datacheck), plus every name the registry claims.
+    # Resolution covers any real audit-family directory (`crwu-audit*` leaves *and* non-leaf
+    # skills such as the optimizer or datacheck, plus `crwu-dev-audit*` maintenance-side
+    # members), plus every name the registry claims.
     skills_root = repo_root / "skills"
     on_disk = (
         {
             child.name
             for child in skills_root.iterdir()
-            if child.is_dir() and child.name.startswith("crwu-audit")
+            if child.is_dir() and child.name.startswith(AUDIT_FAMILY_PREFIX)
         }
         if skills_root.is_dir()
         else set()
@@ -1254,7 +1313,8 @@ def inspect_repository(
     # the declared skill directory must exist, match its frontmatter name, and declare a KB
     # assembly table (either the standard `01-kb-assembly.md` or the cross-cutting
     # `00-KB装配表.md` used by `crwu-audit-datacheck`). Their assembly path keys are already
-    # covered globally by inspect_path_keys(), which walks every crwu-audit* directory.
+    # covered globally by inspect_path_keys(), which walks every audit-family
+    # (crwu-audit*/crwu-dev-audit-*) directory.
     for row in sorted(
         {(r.label, r.skill, r.status): r for r in public_rows}.values(),
         key=lambda r: (r.label, r.skill),
@@ -1308,13 +1368,13 @@ def inspect_repository(
                 path=str(public_references),
             )
 
-    # A crwu-audit skill that is neither an axis leaf nor a known non-leaf skill is a
+    # An audit-family skill that is neither an axis leaf nor a known non-leaf skill is a
     # leftover combined/legacy skill; register it or migrate it onto a real axis prefix.
     registered_names = set(rows_by_skill)
     if skills_root.is_dir():
         for child in sorted(skills_root.iterdir()):
             name = child.name
-            if not child.is_dir() or not name.startswith("crwu-audit"):
+            if not child.is_dir() or not name.startswith(AUDIT_FAMILY_PREFIX):
                 continue
             if name in NON_LEAF_SKILLS or name in registered_names:
                 continue

@@ -205,6 +205,31 @@ class RecalcCheckContractTest(unittest.TestCase):
         self.assertEqual(1, r["summary"]["notRecomputable"], r)
         self.assertIn("除零", r["notRecomputable"][0]["reason"])
 
+    def test_unsupported_operator_inside_function_arg_is_not_silently_dropped(self):
+        """函数参数里的未实现运算符（`&`）必须报「未重算」，**不得被静默丢弃后猜值**。
+
+        真实失效（2026-302150-LX9757-BG8677）：`ev()` 丢弃了 `_expr` 返回的消费位置，
+        于是 `IF(A1&B1="x", 111, 222)` 只解析 `A1` 就返回，条件走错分支、给出 222。
+        隐患不止假阳性——若该错误值恰好等于缓存值，就会被记成"已核"（假阴性）。
+        """
+        import openpyxl
+        wb = openpyxl.Workbook()
+        wb.active["A1"] = '=IF(""&"x"="x",111,222)'
+        r = self._run(wb)
+        self.assertEqual(1, r["summary"]["notRecomputable"], r)
+        self.assertIn("未消费的片段", r["notRecomputable"][0]["reason"])
+        self.assertEqual(0, r["summary"]["mismatched"], "不得拿猜出来的值参与比对")
+        self.assertEqual(0, r["summary"]["matched"], "更不得把猜出来的值记成已核")
+
+    def test_percent_operator_inside_function_arg_is_not_recomputable(self):
+        """`%` 同样未实现，出现在函数参数里也必须报「未重算」。"""
+        import openpyxl
+        wb = openpyxl.Workbook()
+        wb.active["A1"] = "=SUM(50%,10%)"
+        r = self._run(wb)
+        self.assertEqual(1, r["summary"]["notRecomputable"], r)
+        self.assertIn("未消费的片段", r["notRecomputable"][0]["reason"])
+
     def test_type_mismatch_is_not_recomputable_and_does_not_crash(self):
         """类型不匹配（日期 − 文本）→ 标「未重算(类型不匹配)」，**不得打穿整表**。
 
