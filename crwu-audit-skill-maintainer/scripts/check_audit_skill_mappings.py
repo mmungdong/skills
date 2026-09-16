@@ -170,21 +170,32 @@ def _parse_markdown_tree(text: str) -> tuple[str, ...]:
     return _parse_icon_tree(text) or _parse_slash_tree(text) or _parse_box_tree(text)
 
 
-BOX_TREE_LINE = re.compile(r"^(?P<prefix>(?:[│ ]{3})*)(?P<branch>├─|└─) (?P<rest>.+?)\s*$")
+BOX_TREE_LINE = re.compile(r"^(?P<prefix>(?:[│ ]{3})*)(?:(?P<branch>├─|└─) )?(?P<rest>.+?)\s*$")
 
 
 def _parse_box_tree(text: str) -> tuple[str, ...]:
     """`crwu-dws/references/00` §4 规定的 `目录树.md`：`├─`/`└─`，每级缩进 3 字符
     （`│  ` 或 `   `）；folder 行尾 `[F]`，文档行尾为 `extension`（`ext:未提供` 表缺席）。
+
+    2026-09-16 修：规范示例中**根层条目不写分支标记**（`<顶层folder或文档>/` 为裸名），
+    旧实现要求每行都有 `├─`/`└─`，于是整体丢弃根层行、并因层级栈错位把子行挂到错误前缀上
+    （实测 327 节点只解析出 315）。现允许无分支的根层行；输出仍与 JSON 形态一致地排序去重。
     """
     paths: set[str] = set()
     folders: list[str] = []
     for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", ">")):
+            continue  # 标题与 `> key: value` 元数据行不是节点
         match = BOX_TREE_LINE.match(line)
         if not match:
             continue
         level = len(match.group("prefix")) // 3
         rest = match.group("rest").strip()
+        if match.group("branch") is None:
+            # 只有规范式根层裸名才是节点；其余无分支行（表头等）不认
+            if level != 0 or not re.search(r"\s{2,}\S+$", rest):
+                continue
         is_folder = rest.endswith("[F]")
         if is_folder:
             name = rest[: -len("[F]")].strip().rstrip("/").strip()
@@ -740,7 +751,19 @@ def inspect_method_layer_assembly(
         "03-评估方法/05-审核要点/",
         "06-规则库/清单-M-市场法/",
         "06-规则库/清单-M-成本法/",
+        # 2026-09-16：清单-M-* 不止市场法/成本法两份；漏列会让新清单无人装配而不报错
+        # （与当年 CHK-MKT-001~014 缺装同一失效模式）。
+        "06-规则库/清单-M-收益法/",
+        "06-规则库/清单-M-资产基础法/",
         "06-规则库/易错点库/",
+        # 2026-09-16：覆盖层 5 层此前完全不在监视范围。overlay 技能 pending 期间，
+        # 覆盖层规则须由 router 按 overlays[] 命中项装配（见 crwu-audit references/08），
+        # 无装载方即为真实缺口，必须在门禁暴露。
+        "04-监管覆盖/国资/",
+        "04-监管覆盖/证券/",
+        "04-监管覆盖/金融国资/",
+        "04-监管覆盖/司法/",
+        "04-监管覆盖/财务报告/",
     )
     skills_root = repo_root / "skills"
     top_levels = _catalog_top_levels(paths)
@@ -756,6 +779,15 @@ def inspect_method_layer_assembly(
                 text = document.read_text(encoding="utf-8")
                 for key in _addressing_keys(text, top_levels):
                     assembly_keys.setdefault(key, str(document.relative_to(repo_root)))
+
+    # 2026-09-16：router 的分发规则文件也是**合法装配来源**——方法轴与覆盖层技能 pending 期间，
+    # 其知识库目录由 router 按本次 methods[]/overlays[] 命中项追加（见该文件 §「方法层与覆盖层的
+    # 库内装配映射」）。只扫叶子装配表会把这类真实覆盖误报成缺口。
+    router_dispatch = skills_root / "crwu-audit" / "references" / "08-union-dispatch-rules.md"
+    if router_dispatch.is_file():
+        text = router_dispatch.read_text(encoding="utf-8")
+        for key in _addressing_keys(text, top_levels):
+            assembly_keys.setdefault(key, str(router_dispatch.relative_to(repo_root)))
 
     covered: list[dict[str, object]] = []
     gaps: list[dict[str, object]] = []

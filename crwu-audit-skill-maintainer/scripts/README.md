@@ -48,6 +48,12 @@ python3 scripts/kb_tool.py validate --skill-root <skills 安装根> --forbid-lit
 - 资产/业务子技能只登记一级目录根（`request_kind=directory`、`recursive=true`），
   细分对象与子业务在已下载目录包内二次选用，不各建技能。
 
+**2026-09-16 起，下载清单的第三个来源是 router 的分发规则**：方法轴技能（7 个）与覆盖层技能（4 个）
+均为 `pending`，其知识库目录由 router 按本次 `methods[]` / `overlays[]` 的命中项追加
+（映射唯一事实源：`crwu-audit` 技能的 `references/08-union-dispatch-rules.md`
+§「方法层与覆盖层的库内装配映射」）。**`pending` 表示能力未落地，不表示内容可以不装**；
+因此该分发规则文件在本工具的装配缺口检查中**被承认为合法装配来源**。
+
 映射一致性（registry ↔ classification ↔ 真实技能目录 ↔ 最新知识库目录）
 由本技能 `scripts/check_audit_skill_mappings.py` 校验。
 
@@ -58,4 +64,11 @@ python3 scripts/kb_tool.py validate --skill-root <skills 安装根> --forbid-lit
 - `CRWU_KB_ROOT` 与 `KB/<rel>` 现在是**全 root error**（不再限于 crwu-audit*），
   因为本地根模型已整体废止；
 - 旧树残留标记与 `KB/…` 省略号为 warn（消费方需人工判断）；
-- 纪律文本（含"禁止/不写…字面"的说明行）与"禁止出现旧名"的列举行自动豁免。
+- 纪律文本（含"禁止/不写…字面"的说明行）与"禁止出现旧名"的列举行自动豁免；
+- **方法层/清单类/覆盖层装配缺口**（`ASSEMBLY_GAP_METHOD_LAYER`）监视前缀共 **16 项**：
+  `03-评估方法/` 六个方法子目录、06-规则库 下 清单-M-市场法 / 成本法 / 收益法 / 资产基础法 四份清单、
+  `06-规则库/易错点库/`、`04-监管覆盖/` 五个覆盖层目录。2026-09-16 由 9 项扩为 16 项——
+  漏列会让新清单与覆盖层规则**无人装配却不报错**，与当年 `CHK-MKT-001~014` 缺装同一失效模式；
+- **`目录树.md` 解析**（`_parse_box_tree`）接受规范式的**无分支根层行**：`crwu-dws/references/00` §4
+  的渲染示例中根层条目为裸名，旧实现要求每行都有 `├─`/`└─`，会把根层整体丢弃并破坏层级栈
+  （实测 327 节点只解析出 315）。三种目录形态必须给出完全相同的路径集合。
