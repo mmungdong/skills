@@ -299,6 +299,14 @@ def _review_metrics(items: list) -> dict:
     }
 
 
+def _exact_hit_display(metrics: dict) -> str:
+    """首屏用精确数字：精确命中数 / 可评价数（百分比）。不给笼统综合百分比。"""
+    denominator = metrics.get("evaluable") or 0
+    if not denominator:
+        return "数据不足"
+    return "{0}/{1}（{2}）".format(metrics.get("exactHits"), denominator, _format_rate(metrics.get("exactRate")))
+
+
 def _hit_level_row(metrics: dict) -> str:
     """命中层次：精确/部分/未命中三档条数与占比；部分命中是命中，只标层次。"""
     denominator = metrics.get("evaluable") or 0
@@ -2049,7 +2057,7 @@ def render(result: dict, print_trail: bool = None) -> str:
         ("AI 检出问题", counts.get("issuesTotal"), "danger"),
         ("待人工确认", counts.get("pendingConfirmation"), "warning"),
         ("未检查项", counts.get("notChecked"), "neutral"),
-        ("命中率", _format_rate(review_metrics["hitRate"]) if review_items else "数据不足", "primary"),
+        ("精确命中率", _exact_hit_display(review_metrics) if review_items else "数据不足", "primary"),
         ("实际未落实", unresolved_claims, "danger"),
     ):
         parts.append('<div class="metric-card {0}"><span>{1}</span><strong>{2}</strong></div>'.format(

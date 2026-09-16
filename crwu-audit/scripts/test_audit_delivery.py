@@ -439,7 +439,7 @@ class AuditResultRenderTest(unittest.TestCase):
         expected_title = "中瑞世联AI审核报告 - PRJ-2026-0001"
         self.assertIn("<title>{0}</title>".format(expected_title), document)
         self.assertIn("<h1>{0}</h1>".format(expected_title), document)
-        for label in ("AI 检出问题", "待人工确认", "未检查项", "命中率", "实际未落实"):
+        for label in ("AI 检出问题", "待人工确认", "未检查项", "精确命中率", "实际未落实"):
             self.assertIn(label, document)
 
     def test_issue_reasoning_is_folded_behind_explicit_control(self):
@@ -553,6 +553,7 @@ class AuditResultRenderTest(unittest.TestCase):
                 r"命中率：\([0-9]+ \+ [0-9]+\) ÷ [0-9]+。部分命中计为命中、只是层次较低；已验证修改和无法核验项不进入分母；综合值按全部有效明细汇总，不取各维度百分比平均。",
                 r"(精确命中|部分命中|未命中)：[0-9]+ / [0-9]+（[0-9]+(?:\.[0-9])?%）",
                 r"展开不计入命中率分母的条目（共 [0-9]+ 条）",
+                r"[0-9]+/[0-9]+（[0-9]+(?:\.[0-9])?%）",
                 r"[0-9]+(?:\.[0-9])?%",
                 r"[0-9]+ ÷ [0-9]+",
             )):
@@ -809,6 +810,18 @@ class StructuredReviewComparisonTest(unittest.TestCase):
         self.assertEqual(metrics["hitRate"], 50.0)
         self.assertEqual(metrics["exactRate"], 0.0)
         self.assertNotEqual(metrics["hitRate"], metrics["exactRate"])
+
+    def test_header_shows_exact_hit_rate_with_precise_numbers(self):
+        """首屏必须给精确命中率与精确数字（精确命中数/可评价数），不得只给笼统综合命中率。"""
+        result = with_structured_review_comparison()
+        document = delivery.render(result)
+        header = document.split('id="actionable-issues"')[0]
+        self.assertIn("<span>精确命中率</span>", header)
+        self.assertNotIn("<span>命中率</span>", header)
+        metrics = delivery._review_metrics(result["reviewComparison"]["reviewItems"])
+        self.assertIn(
+            "{0}/{1}（{2}）".format(metrics["exactHits"], metrics["evaluable"],
+                                    delivery._format_rate(metrics["exactRate"])), header)
 
     def test_workpaper_capability_notice_is_always_rendered(self):
         """交付件必须明确说明暂不支持底稿文件审核，且底稿意见不计入 AI 命中率。"""
