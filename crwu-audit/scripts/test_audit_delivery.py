@@ -72,6 +72,12 @@ def with_structured_review_comparison() -> dict:
             "module": "数据勾稽",
             "reviewLevel": "一级复核",
             "matchStatus": "exact",
+            "hitExplanation": {
+                "reviewerScope": "specific",
+                "matchedAspects": ["报告结论与测算表不一致，AI 已定位到同一处差异"],
+                "unmatchedAspects": [],
+                "rationale": "AI 复现了复核的同一判断。",
+            },
             "linkedIssueIds": ["ISS-DC-003"],
             "reviewerEvidence": {
                 "file": "01-一级复核意见.docx",
@@ -92,6 +98,12 @@ def with_structured_review_comparison() -> dict:
             "module": "报告披露",
             "reviewLevel": "一级复核",
             "matchStatus": "miss",
+            "hitExplanation": {
+                "reviewerScope": "specific",
+                "matchedAspects": [],
+                "unmatchedAspects": ["评估范围说明的补充情况"],
+                "rationale": "AI 未就该条提出任何判断。",
+            },
             "linkedIssueIds": [],
             "reviewerEvidence": {
                 "file": "01-一级复核意见.docx",
@@ -112,6 +124,12 @@ def with_structured_review_comparison() -> dict:
             "module": "市场法",
             "reviewLevel": "二级复核",
             "matchStatus": "miss",
+            "hitExplanation": {
+                "reviewerScope": "specific",
+                "matchedAspects": [],
+                "unmatchedAspects": ["时间修正依据的补充情况"],
+                "rationale": "AI 未就该条提出任何判断。",
+            },
             "linkedIssueIds": [],
             "reviewerEvidence": {
                 "file": "02-二级复核意见.docx",
@@ -137,6 +155,12 @@ def with_structured_review_comparison() -> dict:
             "module": "市场法",
             "reviewLevel": "二级复核",
             "matchStatus": "partial",
+            "hitExplanation": {
+                "reviewerScope": "general",
+                "matchedAspects": ["扫描件附件的核验必要性（AI 已出 ISS-MKT-007）"],
+                "unmatchedAspects": ["附件逐页内容的可读性判定"],
+                "rationale": "复核条目笼统，AI 覆盖了核验必要性与部分内容，未逐页核验。",
+            },
             "linkedIssueIds": ["ISS-MKT-007"],
             "reviewerEvidence": {
                 "file": "02-二级复核意见.docx",
@@ -155,6 +179,10 @@ def with_structured_review_comparison() -> dict:
         "exactHits": 1,
         "partialHits": 0,
         "misses": 1,
+        "hitRate": 50.0,
+        "exactRate": 50.0,
+        "partialRate": 0.0,
+        "missRate": 50.0,
         "strictHitRate": 50.0,
         "coverageRate": 50.0,
     }
@@ -411,7 +439,7 @@ class AuditResultRenderTest(unittest.TestCase):
         expected_title = "中瑞世联AI审核报告 - PRJ-2026-0001"
         self.assertIn("<title>{0}</title>".format(expected_title), document)
         self.assertIn("<h1>{0}</h1>".format(expected_title), document)
-        for label in ("AI 检出问题", "待人工确认", "未检查项", "严格命中率", "实际未落实"):
+        for label in ("AI 检出问题", "待人工确认", "未检查项", "命中率", "实际未落实"):
             self.assertIn(label, document)
 
     def test_issue_reasoning_is_folded_behind_explicit_control(self):
@@ -521,8 +549,9 @@ class AuditResultRenderTest(unittest.TestCase):
                 r".+复核：[0-9]+ 条意见",
                 r"展开.+复核意见（共 [0-9]+ 条）",
                 r"：[0-9]+ 条，须优先回客户。",
-                r"严格命中率：[0-9]+ ÷ [0-9]+ = [0-9]+(?:\.[0-9])?%。已验证修改和无法核验项不进入分母。",
-                r"严格命中率：[0-9]+ ÷ [0-9]+；覆盖率：\([0-9]+ \+ [0-9]+\) ÷ [0-9]+。已验证修改和无法核验项不进入分母；综合值按全部有效明细汇总，不取各维度百分比平均。",
+                r"命中率：\([0-9]+ \+ [0-9]+\) ÷ [0-9]+ = [0-9]+(?:\.[0-9])?%；精确命中率：[0-9]+(?:\.[0-9])?%。部分命中计为命中、只是层次较低；已验证修改和无法核验项不进入分母。",
+                r"命中率：\([0-9]+ \+ [0-9]+\) ÷ [0-9]+。部分命中计为命中、只是层次较低；已验证修改和无法核验项不进入分母；综合值按全部有效明细汇总，不取各维度百分比平均。",
+                r"(精确命中|部分命中|未命中)：[0-9]+ / [0-9]+（[0-9]+(?:\.[0-9])?%）",
                 r"[0-9]+(?:\.[0-9])?%",
                 r"[0-9]+ ÷ [0-9]+",
             )):
@@ -762,15 +791,62 @@ class StructuredReviewComparisonTest(unittest.TestCase):
 
     def test_metrics_are_recomputed_from_review_items(self):
         result = with_structured_review_comparison()
-        result["reviewComparison"]["metrics"]["strictHitRate"] = 99.0
+        result["reviewComparison"]["metrics"]["hitRate"] = 1.0
         errors = delivery.validate(result)
-        self.assertTrue(any("strictHitRate" in error and "重算" in error for error in errors), errors)
+        self.assertTrue(any("hitRate" in error and "重算" in error for error in errors), errors)
+
+    def test_partial_hits_count_as_hits(self):
+        """部分命中是命中（层次较低），命中率必须含 partial，不得等同于精确命中率。"""
+        result = with_structured_review_comparison()
+        comparison = result["reviewComparison"]
+        comparison["reviewItems"][0]["matchStatus"] = "partial"
+        comparison["reviewItems"][0]["hitExplanation"].update(
+            {"matchedAspects": ["部分覆盖"], "unmatchedAspects": ["未覆盖部分"], "rationale": "只覆盖一部分。"})
+        metrics = delivery._review_metrics(comparison["reviewItems"])
+        self.assertEqual(metrics["exactHits"], 0)
+        self.assertEqual(metrics["partialHits"], 1)
+        self.assertEqual(metrics["hitRate"], 50.0)
+        self.assertEqual(metrics["exactRate"], 0.0)
+        self.assertNotEqual(metrics["hitRate"], metrics["exactRate"])
+
+    def test_out_of_scope_items_are_registered_and_rendered(self):
+        """能力边界条目：不计分但必须登记备查、可见可展开，且不得混入命中率明细。"""
+        result = with_structured_review_comparison()
+        comparison = result["reviewComparison"]
+        comparison["outOfScopeItems"] = [{
+            "itemId": "RV-900", "title": "底稿层面意见（不计分）", "module": "工作底稿与程序",
+            "reviewerEvidence": {"file": "01-一级复核意见.docx", "locator": "底稿第1条", "quote": "未见底稿。"},
+            "handling": "交人工底稿审核",
+            "exclusionReason": "AI 当前不具备底稿审核能力，不计入命中率口径。",
+        }]
+        self.assertEqual([], delivery.validate(result))
+        document = delivery.render(result)
+        self.assertIn("展开不计入命中率的登记备查条目（共 1 条）", document)
+        self.assertIn("底稿层面意见（不计分）", document)
+        # 不得混入命中率明细
+        comparison["outOfScopeItems"][0]["itemId"] = comparison["reviewItems"][0]["itemId"]
+        self.assertTrue(any("不得混入命中率明细" in e for e in delivery.validate(result)))
+        # 缺 exclusionReason 必须报错
+        comparison["outOfScopeItems"][0]["itemId"] = "RV-901"
+        del comparison["outOfScopeItems"][0]["exclusionReason"]
+        self.assertTrue(any("exclusionReason" in e for e in delivery.validate(result)))
+
+    def test_hit_explanation_is_required_and_consistent(self):
+        result = with_structured_review_comparison()
+        item = result["reviewComparison"]["reviewItems"][0]
+        del item["hitExplanation"]
+        self.assertTrue(any("hitExplanation" in e for e in delivery.validate(result)))
+        result = with_structured_review_comparison()
+        item = result["reviewComparison"]["reviewItems"][0]
+        item["hitExplanation"]["unmatchedAspects"] = ["不该有"]
+        self.assertTrue(any("unmatchedAspects" in e for e in delivery.validate(result)))
 
     def test_resolved_and_uncheckable_are_excluded_from_denominator(self):
         result = with_structured_review_comparison()
         document = delivery.render(result)
         self.assertIn("50.0%", document)
-        self.assertIn("1 ÷ 2", document)
+        self.assertIn("命中率：(1 + 0) ÷ 2 = 50.0%", document)
+        self.assertIn("精确命中率：50.0%", document)
         self.assertIn("已验证修改", document)
         self.assertIn("无法核验", document)
 
@@ -799,7 +875,8 @@ class StructuredReviewComparisonTest(unittest.TestCase):
         self.assertIn("AI 审核表现评分卡", document)
         self.assertIn("按复核级次", document)
         self.assertIn("按问题模块", document)
-        self.assertIn("综合严格命中率", document)
+        self.assertIn("综合命中率", document)
+        self.assertIn("综合精确命中率", document)
         self.assertNotIn("综合·AI 单机", document)
 
 
@@ -888,7 +965,7 @@ class AiScorecardTest(unittest.TestCase):
     def test_scorecard_renders_as_tables(self):
         html = delivery.render(with_structured_review_comparison())
         self.assertIn('id="ai-scorecard"', html)
-        for label in ("AI 审核表现评分卡", "综合严格命中率", "综合覆盖率",
+        for label in ("AI 审核表现评分卡", "综合命中率", "综合精确命中率",
                       "按复核级次", "按问题模块", "展开 AI 自查错误记录"):
             self.assertIn(label, html)
 

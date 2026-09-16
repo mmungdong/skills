@@ -70,6 +70,11 @@ REVIEW_CATEGORY_LABEL = {
 }
 REVIEWER_ONLY_LABEL = "仅人工复核发现"
 REVIEW_MATCH_VALUES = {"exact", "partial", "miss"}
+HIT_LEVEL_LABEL = [
+    ("exact", "精确命中"),
+    ("partial", "部分命中"),
+    ("miss", "未命中"),
+]
 REVIEW_MATCH_LABEL = {
     "exact": "AI 精确命中",
     "partial": "AI 部分命中",
@@ -175,6 +180,8 @@ CHECK_RECORD_REQUIRED = [
     "executor",
 ]
 REVIEWER_ONLY_REQUIRED = ["itemId", "title", "reviewerEvidence", "handling", "inFileResolution"]
+# 能力边界条目：AI 当前不具备该层能力（如底稿审核），不计分母/不计漏检，但必须登记备查并渲染
+OUT_OF_SCOPE_REQUIRED = ["itemId", "title", "reviewerEvidence", "handling", "exclusionReason"]
 # ---- AI 审核评分卡（自评；量化工种差距。维度与算法为技能内受控取值，知识库暂无对应词表） ----
 SCORECARD_DIMENSIONS = [
     ("first_delivery_correctness", "首轮交付正确性"),
@@ -220,7 +227,14 @@ def _percentage(numerator: int, denominator: int):
 
 
 def _review_metrics(items: list) -> dict:
-    """从逐条复核事实重算客观指标；已落实与无法核验不进入命中率分母。"""
+    """从逐条复核事实重算客观指标；已落实与无法核验不进入命中率分母。
+
+    口径（2026-09-16 修订）：**部分命中是命中，只是层次较低** ——
+    命中率 = (exact + partial) / evaluable；exact/partial/miss 作为**命中层次**单列。
+    不得用 exact/evaluable 冒充“命中率”（那等于把部分命中当未命中）。
+    `strictHitRate` / `coverageRate` 仅为历史 JSON 兼容别名，展示名分别降为
+    「精确命中率」与「命中率」，不得再作为独立主指标。
+    """
     resolved = [item for item in items if item.get("inFileResolution") == "L-resolved"]
     uncheckable = [item for item in items if item.get("inFileResolution") == "L-uncheckable"]
     evaluable_items = [
@@ -231,6 +245,8 @@ def _review_metrics(items: list) -> dict:
     partial = sum(item.get("matchStatus") == "partial" for item in evaluable_items)
     misses = sum(item.get("matchStatus") == "miss" for item in evaluable_items)
     denominator = len(evaluable_items)
+    hit_rate = _percentage(exact + partial, denominator)
+    exact_rate = _percentage(exact, denominator)
     return {
         "total": len(items),
         "resolved": len(resolved),
@@ -239,9 +255,29 @@ def _review_metrics(items: list) -> dict:
         "exactHits": exact,
         "partialHits": partial,
         "misses": misses,
-        "strictHitRate": _percentage(exact, denominator),
-        "coverageRate": _percentage(exact + partial, denominator),
+        "hitRate": hit_rate,
+        "exactRate": exact_rate,
+        "partialRate": _percentage(partial, denominator),
+        "missRate": _percentage(misses, denominator),
+        "strictHitRate": exact_rate,
+        "coverageRate": hit_rate,
     }
+
+
+def _hit_level_row(metrics: dict) -> str:
+    """命中层次：精确/部分/未命中三档条数与占比；部分命中是命中，只标层次。"""
+    denominator = metrics.get("evaluable") or 0
+    if not denominator:
+        return ""
+    cells = []
+    for key, label in HIT_LEVEL_LABEL:
+        count = {"exact": metrics.get("exactHits"), "partial": metrics.get("partialHits"),
+                 "miss": metrics.get("misses")}[key]
+        rate = {"exact": metrics.get("exactRate"), "partial": metrics.get("partialRate"),
+                "miss": metrics.get("missRate")}[key]
+        cells.append('<span>{0}：{1} / {2}（{3}）</span>'.format(
+            _text(label), _text(count), _text(denominator), _text(_format_rate(rate))))
+    return '<p class="formula hit-levels">{0}{1}</p>'.format(_text("命中层次："), "".join(cells))
 
 
 def _format_rate(value) -> str:
@@ -696,6 +732,28 @@ def validate(result: dict, rendered: bool = False, expect_renderer: bool = False
                     errors.append("{0}.reviewerEvidence.{1} 不得为空".format(where, field))
             if _is_nonempty_str(evidence.get("file")) and str(evidence.get("file")) not in file_names:
                 errors.append("{0}.reviewerEvidence.file 未在 reviewFiles 中登记".format(where))
+            explanation = item.get("hitExplanation")
+            if not isinstance(explanation, dict):
+                errors.append("{0}.hitExplanation 必须是对象（AI 须逐条说明命中了哪些、未命中哪些、判定理由）".format(where))
+            else:
+                scope = explanation.get("reviewerScope")
+                if scope not in ("general", "specific"):
+                    errors.append("{0}.hitExplanation.reviewerScope 必须为 general（复核条目笼统）/ specific（具体）".format(where))
+                matched = explanation.get("matchedAspects")
+                unmatched = explanation.get("unmatchedAspects")
+                for field, value in (("matchedAspects", matched), ("unmatchedAspects", unmatched)):
+                    if not isinstance(value, list) or any(not _is_nonempty_str(x) for x in value):
+                        errors.append("{0}.hitExplanation.{1} 必须是非空字符串数组（可为空数组）".format(where, field))
+                if not _is_nonempty_str(explanation.get("rationale")):
+                    errors.append("{0}.hitExplanation.rationale 不得为空（禁止无理由给判定）".format(where))
+                if isinstance(matched, list) and isinstance(unmatched, list):
+                    match_status = item.get("matchStatus")
+                    if match_status == "exact" and unmatched:
+                        errors.append("{0} matchStatus=exact 时 hitExplanation.unmatchedAspects 必须为空".format(where))
+                    if match_status == "partial" and not (matched and unmatched):
+                        errors.append("{0} matchStatus=partial 时 hitExplanation 必须同时给出 matchedAspects 与 unmatchedAspects".format(where))
+                    if match_status == "miss" and (matched or not unmatched):
+                        errors.append("{0} matchStatus=miss 时 hitExplanation 必须无 matchedAspects 且有 unmatchedAspects".format(where))
             linked = item.get("linkedIssueIds")
             if not isinstance(linked, list):
                 errors.append("{0}.linkedIssueIds 必须是数组".format(where))
@@ -727,6 +785,37 @@ def validate(result: dict, rendered: bool = False, expect_renderer: bool = False
                     errors.append(
                         "reviewComparison.metrics.{0} 必须可由 reviewItems 重算（应为 {1}）".format(key, expected)
                     )
+    out_of_scope = comparison.get("outOfScopeItems")
+    if out_of_scope is not None:
+        if not isinstance(out_of_scope, list):
+            errors.append("reviewComparison.outOfScopeItems 必须是数组（无则省略或空数组）")
+        else:
+            scope_ids = set()
+            for index, item in enumerate(out_of_scope):
+                where = "reviewComparison.outOfScopeItems[{0}]".format(index)
+                if not isinstance(item, dict):
+                    errors.append("{0} 必须是对象".format(where))
+                    continue
+                for field in OUT_OF_SCOPE_REQUIRED:
+                    if field not in item:
+                        errors.append("{0} 缺少字段 {1}".format(where, field))
+                item_id = item.get("itemId")
+                if not _is_nonempty_str(item_id):
+                    errors.append("{0}.itemId 不得为空".format(where))
+                elif item_id in item_ids:
+                    errors.append("{0}.itemId 与 reviewItems 重复：{1}（能力边界条目不得混入命中率明细）".format(where, item_id))
+                elif item_id in scope_ids:
+                    errors.append("outOfScopeItems.itemId 重复：{0}".format(item_id))
+                else:
+                    scope_ids.add(item_id)
+                evidence = item.get("reviewerEvidence") or {}
+                for field in ("file", "locator", "quote"):
+                    if not _is_nonempty_str(evidence.get(field)):
+                        errors.append("{0}.reviewerEvidence.{1} 不得为空".format(where, field))
+                for field in ("title", "handling", "exclusionReason"):
+                    if not _is_nonempty_str(item.get(field)):
+                        errors.append("{0}.{1} 不得为空".format(where, field))
+
     hidden_access = comparison.get("hiddenRegionAccess")
     if hidden_access is not None:
         if not isinstance(hidden_access, list):
@@ -1253,7 +1342,7 @@ def _metric_cells(metrics: dict) -> str:
         for value in (
             metrics["total"], metrics["resolved"], metrics["uncheckable"], metrics["evaluable"],
             metrics["exactHits"], metrics["partialHits"], metrics["misses"],
-            _format_rate(metrics["strictHitRate"]), _format_rate(metrics["coverageRate"]),
+            _format_rate(metrics["hitRate"]), _format_rate(metrics["exactRate"]),
         )
     )
 
@@ -1265,7 +1354,7 @@ def _performance_table(items: list, group_key: str, title: str) -> str:
     parts = ["<h3>{0}</h3>".format(_text(title)), '<div class="table-scroll"><table class="performance-table">']
     parts.append("<thead><tr>" + "".join(
         '<th scope="col">{0}</th>'.format(_text(label))
-        for label in ("维度", "意见", "已验证修改", "无法核验", "可评价", "精确命中", "部分命中", "未命中", "严格命中率", "覆盖率")
+        for label in ("维度", "意见", "已验证修改", "无法核验", "可评价", "精确命中", "部分命中", "未命中", "命中率", "精确命中率")
     ) + "</tr></thead><tbody>")
     for name, grouped in groups.items():
         parts.append("<tr><th scope=\"row\">{0}</th>{1}</tr>".format(_text(name), _metric_cells(_review_metrics(grouped))))
@@ -1282,12 +1371,13 @@ def _scorecard_section(comparison, self_errors) -> str:
         parts.append('<p class="empty">{0}</p>'.format(_text("缺少完整逐条复核数据，无法计算客观命中率")))
     else:
         parts.append('<div class="score-hero"><div><span>{0}</span><strong>{1}</strong></div><div><span>{2}</span><strong>{3}</strong></div></div>'.format(
-            _text("综合严格命中率"), _text(_format_rate(metrics["strictHitRate"])),
-            _text("综合覆盖率"), _text(_format_rate(metrics["coverageRate"]))))
-        parts.append('<p class="formula">{0}：{1} ÷ {2}；{3}：({1} + {4}) ÷ {2}。{5}</p>'.format(
-            _text("严格命中率"), _text(metrics["exactHits"]), _text(metrics["evaluable"]),
-            _text("覆盖率"), _text(metrics["partialHits"]),
-            _text("已验证修改和无法核验项不进入分母；综合值按全部有效明细汇总，不取各维度百分比平均。")))
+            _text("综合命中率"), _text(_format_rate(metrics["hitRate"])),
+            _text("综合精确命中率"), _text(_format_rate(metrics["exactRate"]))))
+        parts.append('<p class="formula">{0}：({1} + {2}) ÷ {3}。{4}</p>'.format(
+            _text("命中率"), _text(metrics["exactHits"]), _text(metrics["partialHits"]),
+            _text(metrics["evaluable"]),
+            _text("部分命中计为命中、只是层次较低；已验证修改和无法核验项不进入分母；综合值按全部有效明细汇总，不取各维度百分比平均。")))
+        parts.append(_hit_level_row(metrics))
         parts.append(_performance_table(items, "reviewLevel", "按复核级次"))
         parts.append(_performance_table(items, "module", "按问题模块"))
     parts.append('<details class="secondary-details"><summary>{0}</summary>'.format(
@@ -1336,10 +1426,17 @@ def _review_item_card(item) -> str:
     in_file = item.get("inFileEvidence") or {}
     closure = item.get("closureEvidence") or {}
     resolution = item.get("inFileResolution")
+    explanation = item.get("hitExplanation") or {}
+    scope_label = {"general": "笼统（复核表述较宽）", "specific": "具体（复核表述限定明确）"}.get(
+        explanation.get("reviewerScope"), IN_FILE_ABSENT_LABEL)
     rows = [
         ("编号", item.get("itemId")),
         ("问题方向", item.get("module")),
         ("AI 对照", REVIEW_MATCH_LABEL.get(item.get("matchStatus"), item.get("matchStatus"))),
+        ("复核条目范围", scope_label),
+        ("AI 命中内容", "；".join(explanation.get("matchedAspects") or []) or "（无）"),
+        ("AI 未命中内容", "；".join(explanation.get("unmatchedAspects") or []) or "（无）"),
+        ("命中判定理由", explanation.get("rationale") or IN_FILE_ABSENT_LABEL),
         ("关联 AI 问题", "、".join(item.get("linkedIssueIds") or []) or "无"),
         ("复核文件", evidence.get("file")),
         ("复核定位", evidence.get("locator")),
@@ -1379,15 +1476,20 @@ def _review_comparison_section(comparison) -> str:
     parts.append('<div class="review-kpis">')
     for label, value, cls in (
         ("复核意见", metrics["total"], ""), ("已验证修改", metrics["resolved"], "good"),
-        ("AI 精确命中", metrics["exactHits"], "good"), ("AI 未命中", metrics["misses"], "warning"),
-        ("严格命中率", _format_rate(metrics["strictHitRate"]), "primary"),
+        ("AI 精确命中", metrics["exactHits"], "good"), ("AI 部分命中", metrics["partialHits"], "good"),
+        ("AI 未命中", metrics["misses"], "warning"),
+        ("命中率", _format_rate(metrics["hitRate"]), "primary"),
+        ("精确命中率", _format_rate(metrics["exactRate"]), ""),
     ):
         parts.append('<div class="metric-card {0}"><span>{1}</span><strong>{2}</strong></div>'.format(
             cls, _text(label), _text(value)))
     parts.append("</div>")
-    parts.append('<p class="formula">{0}：{1} ÷ {2} = {3}。{4}</p>'.format(
-        _text("严格命中率"), _text(metrics["exactHits"]), _text(metrics["evaluable"]),
-        _text(_format_rate(metrics["strictHitRate"])), _text("已验证修改和无法核验项不进入分母。")))
+    parts.append('<p class="formula">{0}：({1} + {2}) ÷ {3} = {4}；{5}：{6}。{7}</p>'.format(
+        _text("命中率"), _text(metrics["exactHits"]), _text(metrics["partialHits"]),
+        _text(metrics["evaluable"]), _text(_format_rate(metrics["hitRate"])),
+        _text("精确命中率"), _text(_format_rate(metrics["exactRate"])),
+        _text("部分命中计为命中、只是层次较低；已验证修改和无法核验项不进入分母。")))
+    parts.append(_hit_level_row(metrics))
     if unclosed:
         parts.append('<p class="closure-alert"><strong>{0}</strong>{1}</p>'.format(
             _text("已称修复但实际未落实"), _text("：{0} 条，须优先回客户。".format(unclosed))))
@@ -1410,14 +1512,42 @@ def _review_comparison_section(comparison) -> str:
             for label, value in (
                 ("已验证修改 ", level_metrics["resolved"]), ("AI 精确命中 ", level_metrics["exactHits"]),
                 ("AI 部分命中 ", level_metrics["partialHits"]), ("AI 未命中 ", level_metrics["misses"]),
-                ("严格命中率 ", _format_rate(level_metrics["strictHitRate"])),
+                ("命中率 ", _format_rate(level_metrics["hitRate"])),
+                ("精确命中率 ", _format_rate(level_metrics["exactRate"])),
             )
         )))
         parts.append('<details class="review-details"><summary>{0}</summary>'.format(
             _text("展开{0}意见（共 {1} 条）".format(level, len(level_items)))))
         parts.extend(_review_item_card(item) for item in level_items)
         parts.append("</details></section>")
+    parts.append(_out_of_scope_block(comparison))
     parts.append("</section>")
+    return "".join(parts)
+
+
+def _out_of_scope_block(comparison) -> str:
+    """能力边界条目：不计分母、不计漏检，但必须登记备查、可见可展开。"""
+    items = comparison.get("outOfScopeItems") or []
+    if not items:
+        return ""
+    parts = ['<details class="review-out-of-scope"><summary>{0}</summary>'.format(
+        _text("展开不计入命中率的登记备查条目（共 {0} 条）".format(len(items))))]
+    parts.append('<p class="formula">{0}</p>'.format(
+        _text("以下条目属 AI 当前不具备的能力层（如底稿审核），不计入命中率分母、不计漏检、不作评分，仅登记备查并交人工复核。")))
+    for item in items:
+        evidence = item.get("reviewerEvidence") or {}
+        rows = [
+            ("编号", item.get("itemId")),
+            ("问题方向", item.get("module")),
+            ("复核文件", evidence.get("file")),
+            ("复核定位", evidence.get("locator")),
+            ("复核原文", evidence.get("quote")),
+            ("不计分原因", item.get("exclusionReason")),
+            ("处理", item.get("handling")),
+        ]
+        parts.append('<article class="review-item"><h4>{0}</h4><table class="kv">{1}</table></article>'.format(
+            _text(item.get("title")), _rows(rows)))
+    parts.append("</details>")
     return "".join(parts)
 
 
@@ -1834,7 +1964,7 @@ def render(result: dict, print_trail: bool = None) -> str:
         ("AI 检出问题", counts.get("issuesTotal"), "danger"),
         ("待人工确认", counts.get("pendingConfirmation"), "warning"),
         ("未检查项", counts.get("notChecked"), "neutral"),
-        ("严格命中率", _format_rate(review_metrics["strictHitRate"]) if review_items else "数据不足", "primary"),
+        ("命中率", _format_rate(review_metrics["hitRate"]) if review_items else "数据不足", "primary"),
         ("实际未落实", unresolved_claims, "danger"),
     ):
         parts.append('<div class="metric-card {0}"><span>{1}</span><strong>{2}</strong></div>'.format(

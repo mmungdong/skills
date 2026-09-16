@@ -347,6 +347,14 @@
         "module": "数据勾稽",
         "reviewLevel": "一级复核",
         "matchStatus": "exact",
+        "hitExplanation": {
+          "reviewerScope": "specific",
+          "matchedAspects": [
+            "报告结论与测算表不一致，AI 已定位到同一处差异"
+          ],
+          "unmatchedAspects": [],
+          "rationale": "AI 复现了复核的同一判断。"
+        },
         "linkedIssueIds": [
           "ISS-DC-003"
         ],
@@ -369,6 +377,14 @@
         "module": "报告披露",
         "reviewLevel": "一级复核",
         "matchStatus": "miss",
+        "hitExplanation": {
+          "reviewerScope": "specific",
+          "matchedAspects": [],
+          "unmatchedAspects": [
+            "评估范围说明的补充情况"
+          ],
+          "rationale": "AI 未就该条提出任何判断。"
+        },
         "linkedIssueIds": [],
         "reviewerEvidence": {
           "file": "01-一级复核意见.docx",
@@ -389,6 +405,14 @@
         "module": "市场法",
         "reviewLevel": "二级复核",
         "matchStatus": "miss",
+        "hitExplanation": {
+          "reviewerScope": "specific",
+          "matchedAspects": [],
+          "unmatchedAspects": [
+            "时间修正依据的补充情况"
+          ],
+          "rationale": "AI 未就该条提出任何判断。"
+        },
         "linkedIssueIds": [],
         "reviewerEvidence": {
           "file": "02-二级复核意见.docx",
@@ -414,6 +438,16 @@
         "module": "市场法",
         "reviewLevel": "二级复核",
         "matchStatus": "partial",
+        "hitExplanation": {
+          "reviewerScope": "general",
+          "matchedAspects": [
+            "扫描件附件的核验必要性（AI 已出 ISS-MKT-007）"
+          ],
+          "unmatchedAspects": [
+            "附件逐页内容的可读性判定"
+          ],
+          "rationale": "复核条目笼统，AI 覆盖了核验必要性与部分内容，未逐页核验。"
+        },
         "linkedIssueIds": [
           "ISS-MKT-007"
         ],
@@ -458,6 +492,10 @@
       "exactHits": 1,
       "partialHits": 0,
       "misses": 1,
+      "hitRate": 50.0,
+      "exactRate": 50.0,
+      "partialRate": 0.0,
+      "missRate": 50.0,
       "strictHitRate": 50.0,
       "coverageRate": 50.0
     }
