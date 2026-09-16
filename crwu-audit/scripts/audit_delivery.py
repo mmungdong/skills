@@ -318,8 +318,10 @@ def _header_hit_rate_caliber(comparison) -> str:
             levels.append(level)
     rows = []
     for level in levels:
-        rows.append(("复核意见（按级次）", level,
-                     sum(1 for i in items if i.get("reviewLevel") == level)))
+        count = sum(1 for i in items if i.get("reviewLevel") == level)
+        if not count:
+            continue  # 该级次条目已整体移入能力边界登记备查（如底稿层），不在此表列 0
+        rows.append(("复核意见（按级次）", level, count))
     rows.extend([
         ("复核意见（按级次）", "合计", metrics["total"]),
         ("命中率分母", "员工复核中未修改（未落实）", metrics["evaluable"]),
