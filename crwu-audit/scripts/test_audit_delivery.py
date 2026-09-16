@@ -556,6 +556,7 @@ class AuditResultRenderTest(unittest.TestCase):
                 r"[0-9]+/[0-9]+（[0-9]+(?:\.[0-9])?%）",
                 r"[0-9]+(?:\.[0-9])?%",
                 r"[0-9]+ ÷ [0-9]+",
+                r"[0-9]+ ÷ [0-9]+ = [0-9]+(?:\.[0-9])?%",
             )):
                 continue  # 受控标签与输入计数/枚举的确定性组合，不创作新的业务结论
             self.assertIn(node, allowed, "渲染器生成了非标签/非数据的文本：{0}".format(node))
@@ -811,17 +812,25 @@ class StructuredReviewComparisonTest(unittest.TestCase):
         self.assertEqual(metrics["exactRate"], 0.0)
         self.assertNotEqual(metrics["hitRate"], metrics["exactRate"])
 
-    def test_header_shows_exact_hit_rate_with_precise_numbers(self):
-        """首屏必须给精确命中率与精确数字（精确命中数/可评价数），不得只给笼统综合命中率。"""
+    def test_header_shows_hit_rate_with_explicit_denominator(self):
+        """首屏必须给出命中率口径与精确数字：分母=员工复核中未修改项，分子=AI 命中项，并按全部复核级次列出条数。"""
         result = with_structured_review_comparison()
         document = delivery.render(result)
         header = document.split('id="actionable-issues"')[0]
-        self.assertIn("<span>精确命中率</span>", header)
-        self.assertNotIn("<span>命中率</span>", header)
+        # 主指标为命中率
+        self.assertIn("<span>命中率</span>", header)
+        # 口径说明与精确数字
+        self.assertIn("命中率口径（精确数字 · 按全部复核级次汇总）", header)
+        self.assertIn("分母＝员工复核意见中未修改（未落实）的条目；分子＝AI 命中的条目（精确命中＋部分命中）。", header)
+        # 分母构成必须按级次列出，避免被误读为只统计某一级复核
+        for level in ("一级复核", "二级复核"):
+            self.assertIn(level, header)
         metrics = delivery._review_metrics(result["reviewComparison"]["reviewItems"])
-        self.assertIn(
-            "{0}/{1}（{2}）".format(metrics["exactHits"], metrics["evaluable"],
-                                    delivery._format_rate(metrics["exactRate"])), header)
+        numerator = metrics["exactHits"] + metrics["partialHits"]
+        self.assertIn("{0} ÷ {1} = {2}".format(
+            numerator, metrics["evaluable"], delivery._format_rate(metrics["hitRate"])), header)
+        self.assertIn("{0} ÷ {1} = {2}".format(
+            metrics["exactHits"], metrics["evaluable"], delivery._format_rate(metrics["exactRate"])), header)
 
     def test_workpaper_capability_notice_is_always_rendered(self):
         """交付件必须明确说明暂不支持底稿文件审核，且底稿意见不计入 AI 命中率。"""

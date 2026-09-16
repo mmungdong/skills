@@ -299,12 +299,55 @@ def _review_metrics(items: list) -> dict:
     }
 
 
-def _exact_hit_display(metrics: dict) -> str:
-    """首屏用精确数字：精确命中数 / 可评价数（百分比）。不给笼统综合百分比。"""
-    denominator = metrics.get("evaluable") or 0
-    if not denominator:
-        return "数据不足"
-    return "{0}/{1}（{2}）".format(metrics.get("exactHits"), denominator, _format_rate(metrics.get("exactRate")))
+def _header_hit_rate_caliber(comparison) -> str:
+    """首屏命中率口径表（精确数字，按全部复核级次汇总）。
+
+    口径：分母 = 员工复核意见中**未修改（未落实）**的条目；分子 = **AI 命中**的条目
+    （精确命中 + 部分命中）。已剔除项、未命中项与各复核级次条数一并列出，
+    使读者可直接复核分母构成，不会误以为只统计了某一级复核。
+    """
+    items = comparison.get("reviewItems") or []
+    if not items:
+        return ""
+    metrics = _review_metrics(items)
+    out_of_scope = comparison.get("outOfScopeItems") or []
+    levels = []
+    for entry in sorted(comparison.get("reviewFiles") or [], key=lambda e: e.get("order", 9999)):
+        level = entry.get("level")
+        if _is_nonempty_str(level) and level not in levels:
+            levels.append(level)
+    rows = []
+    for level in levels:
+        rows.append(("复核意见（按级次）", level,
+                     sum(1 for i in items if i.get("reviewLevel") == level)))
+    rows.extend([
+        ("复核意见（按级次）", "合计", metrics["total"]),
+        ("命中率分母", "员工复核中未修改（未落实）", metrics["evaluable"]),
+        ("命中率分子", "AI 命中 · 精确命中", metrics["exactHits"]),
+        ("命中率分子", "AI 命中 · 部分命中", metrics["partialHits"]),
+        ("AI 未命中", "计入分母并计为漏检", metrics["misses"]),
+        ("已剔除 · 不计入分母", "已在件落实（含已修改故 AI 不可能命中）", metrics["resolved"]),
+        ("已剔除 · 不计入分母", "材料缺失或不可读（未能核验）", metrics["uncheckable"]),
+        ("已剔除 · 不计入分母", "能力边界（底稿类，仅登记备查）", len(out_of_scope)),
+    ])
+    numerator = metrics["exactHits"] + metrics["partialHits"]
+    rows.extend([
+        ("结果", "分子 ÷ 分母 = 命中率", "{0} ÷ {1} = {2}".format(
+            numerator, metrics["evaluable"], _format_rate(metrics["hitRate"]))),
+        ("结果（层次）", "精确命中率（精确命中 ÷ 分母）", "{0} ÷ {1} = {2}".format(
+            metrics["exactHits"], metrics["evaluable"], _format_rate(metrics["exactRate"]))),
+    ])
+    parts = ['<h4>{0}</h4>'.format(_text("命中率口径（精确数字 · 按全部复核级次汇总）")),
+             '<p class="formula">{0}</p>'.format(_text(
+                 "分母＝员工复核意见中未修改（未落实）的条目；分子＝AI 命中的条目（精确命中＋部分命中）。"
+                 "已在件落实、材料缺失或不可读、超出能力层的条目不进入分母。")),
+             '<div class="table-scroll"><table><thead><tr>' + "".join(
+                 '<th scope="col">{0}</th>'.format(_text(label)) for label in ("口径", "分组", "条数 / 结果")
+             ) + "</tr></thead><tbody>"]
+    for row in rows:
+        parts.append("<tr>" + "".join("<td>{0}</td>".format(_text(cell)) for cell in row) + "</tr>")
+    parts.append("</tbody></table></div>")
+    return "".join(parts)
 
 
 def _hit_level_row(metrics: dict) -> str:
@@ -2057,12 +2100,13 @@ def render(result: dict, print_trail: bool = None) -> str:
         ("AI 检出问题", counts.get("issuesTotal"), "danger"),
         ("待人工确认", counts.get("pendingConfirmation"), "warning"),
         ("未检查项", counts.get("notChecked"), "neutral"),
-        ("精确命中率", _exact_hit_display(review_metrics) if review_items else "数据不足", "primary"),
+        ("命中率", _format_rate(review_metrics["hitRate"]) if review_items else "数据不足", "primary"),
         ("实际未落实", unresolved_claims, "danger"),
     ):
         parts.append('<div class="metric-card {0}"><span>{1}</span><strong>{2}</strong></div>'.format(
             cls, _text(label), _text(value)))
     parts.append("</div>")
+    parts.append(_header_hit_rate_caliber(rendered_result.get("reviewComparison") or {}))
     parts.append('<details class="summary-details"><summary>{0}</summary>{1}</details>'.format(
         _text("展开问题分布与核验概览"), _summary_breakdown_section(rendered_result)))
     parts.append("</section>")
