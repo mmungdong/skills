@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "fae695d8-239a-4013-9208-411e7987e774",
+  "path": "crwu-audit-asset-scrap-materials",
+  "path_key": "crwu-audit-asset-scrap-materials",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-asset-scrap-materials",
+    "branch": null
+  }
+}

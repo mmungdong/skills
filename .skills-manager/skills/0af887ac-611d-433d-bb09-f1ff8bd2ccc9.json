@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "0af887ac-611d-433d-bb09-f1ff8bd2ccc9",
+  "path": "crwu-audit-asset-asset-group-goodwill",
+  "path_key": "crwu-audit-asset-asset-group-goodwill",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-asset-asset-group-goodwill",
+    "branch": null
+  }
+}

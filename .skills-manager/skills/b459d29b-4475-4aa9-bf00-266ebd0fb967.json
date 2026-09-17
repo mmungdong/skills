@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "b459d29b-4475-4aa9-bf00-266ebd0fb967",
+  "path": "crwu-audit-asset-debt",
+  "path_key": "crwu-audit-asset-debt",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-asset-debt",
+    "branch": null
+  }
+}

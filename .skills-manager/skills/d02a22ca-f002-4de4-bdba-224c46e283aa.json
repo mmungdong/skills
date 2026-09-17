@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "d02a22ca-f002-4de4-bdba-224c46e283aa",
+  "path": "crwu-audit-external-data",
+  "path_key": "crwu-audit-external-data",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-external-data",
+    "branch": null
+  }
+}

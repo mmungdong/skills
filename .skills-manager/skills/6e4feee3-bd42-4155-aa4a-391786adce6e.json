@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "6e4feee3-bd42-4155-aa4a-391786adce6e",
+  "path": "crwu-audit-biz-transaction-disposal",
+  "path_key": "crwu-audit-biz-transaction-disposal",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/mmungdong/crwu-ai",
+    "subpath": "skills/crwu-audit-biz-transaction-disposal",
+    "branch": null
+  }
+}
