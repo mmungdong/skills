@@ -58,7 +58,7 @@
       "severity": "medium",
       "issueType": "rule_defect",
       "decision": "fail",
-      "problemDescription": "可比案例交易日期与评估基准日存在时间差异，未见修正，也未见不调整的分析与理由（示意）。",
+      "problemDescription": "三个可比案例都用基准日之前成交的价格，测算里没有任何时间修正。\n案例成交日与基准日相差越远，价格可比性越弱，现在看不出这个差异有没有影响结论。\n请打开 市场法测算表.xlsx 的「市场法」表 F18:F22，对照 评估说明.docx 第 35 页的案例说明核对。",
       "handlingRequirement": "补充说明并核实测算",
       "ruleEvidence": [
         {
@@ -123,7 +123,7 @@
       "severity": "high",
       "issueType": "rule_defect",
       "decision": "fail",
-      "problemDescription": "测算明细表汇总值 1,234.00 与报告结论 1,244.00 不一致（示意数值）。",
+      "problemDescription": "测算明细表汇总数 1,234.00 与报告结论 1,244.00 对不上。\n两个数字相差 10.00，报告正文没有说明差额来源，结论与底稿不一致。\n请打开 测算明细表.xlsx 的「汇总」表 B12，与 报告.docx 第 12 页的评估结论核对。",
       "handlingRequirement": "核实后处理",
       "ruleEvidence": [
         {
@@ -616,7 +616,7 @@
   },
   "fileTrace": {
     "generatedAt": "2026-09-10T09:30:00+08:00",
-    "rendererVersion": "renderer/1.2.2",
+    "rendererVersion": "renderer/1.2.4",
     "sourceDigest": "",
     "embeddedJsonDigest": ""
   },

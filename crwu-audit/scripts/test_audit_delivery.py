@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AuditResult 校验与 HTML 渲染的契约测试（送达规范 v1.1）。
+"""AuditResult 校验与 HTML 渲染的契约测试（送达规范 v1.4）。
 
 运行：在技能目录内 `python3 scripts/test_audit_delivery.py`
 本测试**自洽**：只依赖本技能 `scripts/` 内的脚本、schema 与样例，可随技能一起安装。
@@ -31,10 +31,10 @@ REGION_ORDER = [
     "project-info",
     "summary",
     "actionable-issues",
+    "manual-confirmation-items",
     "external-data-verification",
     "review-comparison",
     "ai-scorecard",
-    "manual-confirmation-items",
     "audit-basis",
     "scope-and-not-checked",
     "professional-trail",
@@ -286,6 +286,144 @@ class AuditResultValidationTest(unittest.TestCase):
         errors = delivery.validate(result)
         self.assertTrue(any("nodeId" in error for error in errors), errors)
 
+    def _problem_errors(self, description):
+        result = load_sample()
+        result["issues"][0]["problemDescription"] = description
+        return delivery.validate(result)
+
+    def test_problem_description_must_be_two_block_plain_language(self):
+        """§4.6：首句结论 + 员工话明细两段式；样例即为合规写法。"""
+        self.assertEqual([], self._problem_errors(load_sample()["issues"][0]["problemDescription"]))
+
+        errors = self._problem_errors("可比案例交易日期与基准日存在时间差异，未见修正，也未见不调整的分析与理由。")
+        self.assertTrue(any("必须是两段式" in error for error in errors), errors)
+
+        errors = self._problem_errors(
+            "三个案例都没有做交易时间修正。\n"
+            "案例成交日与基准日相差越远，价格可比性越弱；现在看不出这个差异有没有影响结论。\n"
+            "请打开 市场法测算表.xlsx 的「市场法」表 F18:F22 核对。"
+        )
+        self.assertEqual([], errors)
+
+    def test_problem_description_requires_at_least_two_detail_lines(self):
+        result = load_sample()
+        issue = result["issues"][0]
+        issue["problemDescription"] = (
+            "三个可比案例均未进行时间修正。\n"
+            "请打开 市场法测算表.xlsx 的「市场法」表 F18:F22 核对。"
+        )
+        errors = delivery.validate(result)
+        self.assertTrue(
+            any("明细 1 行，少于 2 行下限" in error for error in errors),
+            errors,
+        )
+
+    def test_problem_description_limits_headline_and_detail_length(self):
+        result = load_sample()
+        issue = result["issues"][0]
+        location = "请打开 市场法测算表.xlsx 的「市场法」表 F18:F22，对照 评估说明.docx 第 35 页核对。"
+        issue["problemDescription"] = (
+            "三个可比案例的交易日期与评估基准日之间存在明显的时间差异，但市场法测算表里没有任何时间修正系数，也没有关于不调整理由的说明。\n"
+            "案例成交日与基准日相差越远，价格可比性越弱，现在看不出这个差异有没有影响结论。\n"
+            "{0}".format(location)
+        )
+        errors = delivery.validate(result)
+        self.assertTrue(any("首句" in error and "超过 60 字上限" in error for error in errors), errors)
+
+        issue["problemDescription"] = "三个案例都没有做交易时间修正。\n" + "、" * 100 + "。"
+        errors = delivery.validate(result)
+        self.assertTrue(any("明细第 1 行" in error and "字上限" in error for error in errors), errors)
+
+        issue["problemDescription"] = "三个案例都没有做交易时间修正。\n" + "\n".join([location] * 5)
+        errors = delivery.validate(result)
+        self.assertTrue(any("超过 4 行上限" in error for error in errors), errors)
+
+        over_budget_line = "、" * 90 + "汇总!B12"
+        over_budget_headline = "、" * 59 + "。"
+        issue["problemDescription"] = over_budget_headline + "\n" + "\n".join([over_budget_line] * 4)
+        errors = delivery.validate(result)
+        self.assertTrue(any("字上限（规则要求与判定链放 gapAnalysis）" in error for error in errors), errors)
+
+    def test_problem_description_detail_line_must_end_with_sentence_or_locator(self):
+        result = load_sample()
+        result["issues"][0]["problemDescription"] = (
+            "三个案例都没有做交易时间修正。\n"
+            "案例成交日与基准日相差越远价格可比性越弱现在看不出这个差异有没有影响结论\n"
+            "请打开 市场法测算表.xlsx 的「市场法」表 F18:F22 核对。"
+        )
+        errors = delivery.validate(result)
+        self.assertTrue(any("明细第 1 行" in error and "可核对落点" in error for error in errors), errors)
+
+    def test_problem_description_headline_must_not_leak_internal_codes(self):
+        result = load_sample()
+        result["issues"][0]["problemDescription"] = (
+            "见 RULE-DC-004 与 06-规则库/清单-数据校对.md。\n"
+            "请打开 市场法测算表.xlsx 的「市场法」表 F18:F22 核对。"
+        )
+        errors = delivery.validate(result)
+        self.assertTrue(any("首句含" in error and "规则编号" in error for error in errors), errors)
+        self.assertTrue(any("知识库相对路径" in error for error in errors), errors)
+
+    def test_numeric_ranges_are_not_mistaken_for_knowledge_base_paths(self):
+        """回测修正：`0-50/51-100/101-150` 这类区间值与 `L206-L302` 不是知识库路径。"""
+        errors = self._problem_errors(
+            "面积修正分级只在底稿，说明未披露。\n"
+            "妇女表分级为 0-50/51-100/101-150/151-200→100/99/98/97，与文澜表区间不同。\n"
+            "请打开 测算明细表.xlsx 的「标准化处理-妇女」表 W16:X19 与说明 L206-L302 核对。"
+        )
+        self.assertEqual([], errors)
+
+    def test_problem_description_detail_must_name_a_material_locator(self):
+        errors = self._problem_errors(
+            "汇总表数据与报告结论对不上。\n"
+            "两个数字相差 10.00，报告正文没有说明差额来源。\n"
+            "请项目负责人重新核实并补充说明。"
+        )
+        self.assertTrue(any("明细未给出可核对的文件与位置" in error for error in errors), errors)
+
+    def test_problem_description_rejects_absolute_paths(self):
+        errors = self._problem_errors(
+            "汇总表数据与报告结论对不上。\n"
+            "两个数字相差 10.00，报告正文没有说明差额来源。\n"
+            "见 /Users/example/报告.docx 与 测算明细表.xlsx 汇总!B12。"
+        )
+        self.assertTrue(any("绝对路径" in error for error in errors), errors)
+
+    def test_problem_description_headline_rejects_raw_formula_and_cell_dump(self):
+        """回测（2026-302514-LX10034-BG8697）：首句塞公式串与区域坐标时员工读不懂。"""
+        result = load_sample()
+        result["issues"][0]["problemDescription"] = (
+            "同一评估对象的年租金存在两个值，04计算底稿!租金评估明细表-妇女 AD11=SUM(AD6:AD10)=472900。\n"
+            "03评估明细表 同一 5 个单元合计 483,800 元，相差 10,900 元。\n"
+            "请打开 03评估明细表-文澜.xlsx 的「明细表」表 AB6:AB10 核对。"
+        )
+        errors = delivery.validate(result)
+        self.assertTrue(any("首句含公式/单元格坐标/文件定位串" in error for error in errors), errors)
+
+    def test_real_report_description_styles_are_all_rejected(self):
+        """回测回归：真实项目里“员工读不懂”的四种典型写法都必须被拦下。"""
+        styles = {
+            "坐标串堆叠": (
+                "年租金在两张表中不一致：04计算底稿!租金评估明细表-妇女 AD11=472900，"
+                "03评估明细表!明细表 AB38=2944800，两者差 10,900 元。"
+            ),
+            "公式串": (
+                "评估明细汇总表 F8=SUM(明细表!AB6:AB10)/10000=48.38，与底稿口径不一致，"
+                "报告结论采用 294.48 万元。"
+            ),
+            "案例目录相对路径": (
+                "工作版/03评估明细表-文澜.xlsx 的 AB6:AB10 与工作版/04计算底稿 的 AD6:AD10 不一致，"
+                "相差 10,900 元，报告未说明。"
+            ),
+        }
+        for name, description in styles.items():
+            with self.subTest(style=name):
+                errors = self._problem_errors(description)
+                self.assertTrue(
+                    any("必须是两段式" in error or "首句" in error for error in errors),
+                    "{0} 未被拦截：{1}".format(name, errors),
+                )
+
     def test_not_checked_reason_code_enum(self):
         result = load_sample()
         result["scope"]["notCheckedItems"][0]["reasonCode"] = "whatever"
@@ -380,6 +518,27 @@ class AuditResultRenderTest(unittest.TestCase):
             positions.append(index)
         self.assertEqual(sorted(positions), positions, "区域顺序必须符合 §3 交付结构")
 
+    def test_manual_confirmation_directly_follows_ai_issues_in_body_and_catalog(self):
+        document = delivery.render(load_sample())
+        body = re.search(r'<main id="audit-report">(.*?)</main>', document, re.S).group(1)
+        self.assertRegex(
+            body,
+            re.compile(
+                r'<section id="actionable-issues">.*?</section>\s*'
+                r'<section id="manual-confirmation-items">',
+                re.S,
+            ),
+        )
+        catalog = re.search(r'<nav class="report-catalog".*?</nav>', document, re.S).group(0)
+        self.assertLess(
+            catalog.find('href="#actionable-issues"'),
+            catalog.find('href="#manual-confirmation-items"'),
+        )
+        self.assertLess(
+            catalog.find('href="#manual-confirmation-items"'),
+            catalog.find('href="#external-data-verification"'),
+        )
+
     def test_renderer_uses_standalone_template_with_sidebar_catalog(self):
         self.assertTrue(TEMPLATE_PATH.is_file(), "HTML 模板必须独立存放在 skill/template/")
         template = TEMPLATE_PATH.read_text(encoding="utf-8")
@@ -441,6 +600,46 @@ class AuditResultRenderTest(unittest.TestCase):
         self.assertIn("<h1>{0}</h1>".format(expected_title), document)
         for label in ("AI 检出问题", "待人工确认", "未检查项", "精确命中率", "实际未落实"):
             self.assertIn(label, document)
+
+    def test_summary_narrative_is_folded_and_action_digest_uses_json_facts(self):
+        result = load_sample()
+        document = delivery.render(result)
+        summary_start = document.find('id="summary"')
+        summary_end = document.find('</section>', summary_start)
+        summary = document[summary_start:summary_end]
+        narrative = result["summary"]["narrative"]
+        self.assertIn('class="summary-action-digest"', summary)
+        self.assertIn("优先处理", summary)
+        self.assertIn("继续核对", summary)
+        self.assertIn("人工确认", summary)
+        self.assertIn(result["issues"][0]["title"], summary)
+        self.assertIn(result["manualConfirmationItems"][0]["title"], summary)
+        self.assertRegex(
+            summary,
+            re.compile(
+                r'<details class="summary-narrative-details"><summary>查看完整 AI 审核说明</summary>.*?'
+                + re.escape(narrative),
+                re.S,
+            ),
+        )
+
+    def test_action_kpis_link_to_their_json_backed_sections(self):
+        document = delivery.render(load_sample())
+        for href, label, value in (
+            ("#actionable-issues", "AI 检出问题", 2),
+            ("#manual-confirmation-items", "待人工确认", 1),
+            ("#not-checked-items", "未检查项", 1),
+        ):
+            self.assertRegex(
+                document,
+                re.compile(
+                    r'<a class="metric-card metric-link[^"]*" href="{0}">.*?'
+                    r'<span>{1}</span><strong>{2}</strong>'.format(
+                        re.escape(href), re.escape(label), value
+                    ),
+                    re.S,
+                ),
+            )
 
     def test_issue_reasoning_is_folded_behind_explicit_control(self):
         document = delivery.render(with_structured_review_comparison())
@@ -510,6 +709,66 @@ class AuditResultRenderTest(unittest.TestCase):
     def test_render_is_deterministic(self):
         self.assertEqual(self.document, delivery.render(load_sample()))
 
+    def test_problem_description_renders_headline_and_details_separately(self):
+        """§4.6：首句单行突出，明细逐行；不得拼成一整段。"""
+        document = delivery.render(load_sample())
+        self.assertIn('class="problem-headline"', document)
+        self.assertIn('class="problem-details"', document)
+        matches = re.findall(
+            r'<p class="problem-headline"><span class="problem-description">(.*?)</span></p>'
+            r'<ul class="problem-details">(.*?)</ul>',
+            document,
+            re.S,
+        )
+        self.assertEqual(2, len(matches))
+        by_headline = {headline: details for headline, details in matches}
+        self.assertIn("三个可比案例都用基准日之前成交的价格，测算里没有任何时间修正。", by_headline)
+        details = by_headline["三个可比案例都用基准日之前成交的价格，测算里没有任何时间修正。"]
+        detail_items = re.findall(r"<li>(.*?)</li>", details)
+        self.assertEqual(2, len(detail_items))
+        for item in detail_items:
+            self.assertNotIn("\n", item)
+        self.assertIn("请打开 市场法测算表.xlsx 的「市场法」表 F18:F22", detail_items[-1])
+        self.assertIn("评估说明.docx 第 35 页", detail_items[-1])
+
+    def test_issue_location_panel_shows_summary_and_deduplicated_material_locations(self):
+        result = load_sample()
+        issue = result["issues"][0]
+        duplicate = copy.deepcopy(issue["materialEvidence"][0])
+        issue["materialEvidence"].append(duplicate)
+        document = delivery.render(result)
+        issues_start = document.find('id="actionable-issues"')
+        title_position = document.find(issue["title"], issues_start)
+        card_start = document.rfind('<article class="issue-card', 0, title_position)
+        card_end = document.find('<article class="issue-card', title_position)
+        if card_end == -1:
+            card_end = document.find('</section>', title_position)
+        first_card = document[card_start:card_end]
+        self.assertIn('class="issue-location-panel"', first_card)
+        self.assertIn(issue["locationSummary"], first_card)
+        evidence = issue["materialEvidence"][0]
+        expected = (
+            '<span class="location-file">{0}</span>'
+            '<span class="location-arrow" aria-hidden="true">→</span>'
+            '<span class="location-locator">{1}</span>'
+        ).format(evidence["displayName"], evidence["locator"])
+        self.assertEqual(1, first_card.count(expected))
+
+    def test_issue_location_panel_escapes_file_and_locator(self):
+        result = load_sample()
+        result["issues"][0]["materialEvidence"][0]["displayName"] = "<b>报告.docx</b>"
+        result["issues"][0]["materialEvidence"][0]["locator"] = "<script>bad()</script>"
+        document = delivery.render(result)
+        issues_start = document.find('id="actionable-issues"')
+        title_position = document.find(result["issues"][0]["title"], issues_start)
+        card_start = document.rfind('<article class="issue-card', 0, title_position)
+        card_end = document.find('</section>', title_position)
+        card = document[card_start:card_end]
+        self.assertIn('class="issue-location-panel"', card)
+        self.assertIn("&lt;b&gt;报告.docx&lt;/b&gt;", card)
+        self.assertIn("&lt;script&gt;bad()&lt;/script&gt;", card)
+        self.assertNotIn("<script>bad()</script>", card)
+
     def test_dynamic_content_is_escaped(self):
         result = load_sample()
         payload = "<script>alert(1)</script>"
@@ -566,12 +825,19 @@ class AuditResultRenderTest(unittest.TestCase):
 
         collect(self.result)
         allowed.add("中瑞世联AI审核报告 - {0}".format(self.result["auditTask"]["projectId"]))
-        allowed.update({"✅", "❌"})
+        allowed.update({"✅", "❌", "→"})
+        for issue in self.result.get("issues", []):
+            # §4.6：问题描述按两段式分行呈现，文本节点即输入数据的分行切片，非渲染器新句
+            headline, details = delivery.split_problem_description(issue.get("problemDescription"))
+            allowed.update({headline} if headline else set())
+            allowed.update(details)
         for node in text_nodes(self.document):
             if re.fullmatch(r"[0-9a-f]{64}", node):
                 continue  # 渲染期计算的来源/嵌入摘要，可由输入确定性重算
             if re.fullmatch(r"[0-9]+", node):
                 continue  # 渲染期按输入确定性重算的计数（如概览分区项数），非业务句子
+            if node in ("问题描述",):
+                continue  # 受控字段标签（§4.6 问题描述区标题），与「规则依据」「材料证据」同类
             if any(re.fullmatch(pattern, node) for pattern in (
                 r"(问题方向|严重程度|问题类型|判定)：.+",
                 r"展开修改意见（共 [0-9]+ 项）",
@@ -751,10 +1017,55 @@ class AuditDeliveryCliTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "broken.json"
             out = Path(tmp) / "out.html"
+            json_out = Path(tmp) / "out.json"
             path.write_text(json.dumps(broken, ensure_ascii=False), encoding="utf-8")
             with contextlib.redirect_stderr(io.StringIO()):
-                self.assertEqual(1, delivery.main(["render", str(path), "--out", str(out)]))
+                self.assertEqual(1, delivery.main([
+                    "render", str(path), "--out", str(out), "--json-out", str(json_out)
+                ]))
             self.assertFalse(out.exists(), "校验失败时不得产出 HTML")
+            self.assertFalse(json_out.exists(), "校验失败时不得产出配套 JSON")
+
+    def test_render_writes_json_matching_html_embedded_result(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            html_path = Path(temp_dir) / "审核意见.PRJ-2026-0001.html"
+            json_path = Path(temp_dir) / "审核结果.PRJ-2026-0001.json"
+            with contextlib.redirect_stdout(io.StringIO()):
+                exit_code = delivery.main([
+                    "render", str(SAMPLE_PATH),
+                    "--out", str(html_path),
+                    "--json-out", str(json_path),
+                ])
+            self.assertEqual(0, exit_code)
+            archived = json.loads(json_path.read_text(encoding="utf-8"))
+            document = html_path.read_text(encoding="utf-8")
+            embedded = json.loads(re.search(
+                r'<script id="audit-result" type="application/json">(.*?)</script>',
+                document,
+                re.S,
+            ).group(1))
+            self.assertEqual(archived, embedded)
+            self.assertEqual(delivery.RENDERER_VERSION, archived["fileTrace"]["rendererVersion"])
+
+    def test_invalid_json_gate_writes_neither_output(self):
+        result = load_sample()
+        result["issues"][0]["problemDescription"] = "只有一段，不合规。"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "invalid.json"
+            source.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
+            html_path = Path(temp_dir) / "result.html"
+            json_path = Path(temp_dir) / "result.json"
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                exit_code = delivery.main([
+                    "render", str(source),
+                    "--out", str(html_path),
+                    "--json-out", str(json_path),
+                ])
+            self.assertEqual(1, exit_code)
+            self.assertIn("issues[0].problemDescription", stderr.getvalue())
+            self.assertFalse(html_path.exists())
+            self.assertFalse(json_path.exists())
 
 
 class ReviewerOnlyInFileResolutionTest(unittest.TestCase):
@@ -1068,6 +1379,32 @@ class AiScorecardTest(unittest.TestCase):
         for label in ("AI 审核表现评分卡", "综合命中率", "综合精确命中率",
                       "按复核级次", "按问题模块", "展开 AI 自查错误记录"):
             self.assertIn(label, html)
+
+
+class DeliveryContractDocumentationTest(unittest.TestCase):
+    """送达版本、JSON-first 命令和展示映射必须在安装包内同步。"""
+
+    def test_v14_contract_versions_and_json_first_terms_are_synchronized(self):
+        skill_root = Path(__file__).resolve().parent.parent
+        repo_root = skill_root.parents[1]
+        spec = (skill_root / "references" / "11-html-delivery-spec.md").read_text(encoding="utf-8")
+        scripts_readme = (skill_root / "scripts" / "README.md").read_text(encoding="utf-8")
+        skill = (skill_root / "SKILL.md").read_text(encoding="utf-8")
+        skills_readme = (repo_root / "skills" / "README.md").read_text(encoding="utf-8")
+        changelog = (repo_root / "docs" / "CHANGELOG.md").read_text(encoding="utf-8")
+
+        self.assertEqual("renderer/1.2.4", delivery.RENDERER_VERSION)
+        for content in (spec, scripts_readme, skill, skills_readme, changelog):
+            self.assertIn("v1.4", content)
+        for content in (spec, scripts_readme, skill):
+            self.assertIn("--json-out", content)
+            self.assertIn("JSON 校验", content)
+        self.assertIn("summary.counts.issuesTotal", spec)
+        self.assertIn("issues[].locationSummary", spec)
+        self.assertIn("issues[].materialEvidence[]", spec)
+        self.assertIn("manualConfirmationItems[]", spec)
+        self.assertIn("scope.notCheckedItems[]", spec)
+        self.assertIn("HTML 内嵌", spec)
 
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CRWU 审核意见交付工具：AuditResult 校验 + 单文件 HTML 渲染。
 
-实现《CRWU 审核意见 HTML 送达规范 v1.1》
+实现《CRWU 审核意见 HTML 送达规范 v1.4》
 （正文：本技能 references/11-html-delivery-spec.md）：
 
 - AuditResult JSON 是唯一事实源；HTML 仅如实呈现，不新增/删除/合并/改写任何结论；
@@ -10,7 +10,7 @@
 
 用法：
     python3 scripts/audit_delivery.py validate <audit-result.json> [--rendered]
-    python3 scripts/audit_delivery.py render   <audit-result.json> --out <opinion.html>
+    python3 scripts/audit_delivery.py render   <audit-result.json> --out <opinion.html> --json-out <result.json>
 退出码：0 成功；1 校验失败（错误打印到 stderr）。
 """
 
@@ -24,7 +24,7 @@ import re
 import sys
 from pathlib import Path
 
-RENDERER_VERSION = "renderer/1.2.2"
+RENDERER_VERSION = "renderer/1.2.4"
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "template" / "audit-report.html"
 SCHEMA_VERSION_PREFIX = "1."
 
@@ -130,6 +130,7 @@ EXT_DATA_UNAVAILABLE_TEXT = "不可用（未经外部数据核验）"
 EXT_DATA_NOT_FETCHED_TEXT = "未取数"
 EXT_DATA_NO_DEVIATION_TEXT = "无出入（符合）"
 EXT_DATA_UNSPECIFIED_SOURCE_TEXT = "未列明来源"
+SUMMARY_DIGEST_ITEM_LIMIT = 3
 
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 ABSOLUTE_PATH_PATTERNS = [
@@ -138,6 +139,45 @@ ABSOLUTE_PATH_PATTERNS = [
     (re.compile(r"file://"), "file:// 地址"),
 ]
 FORBIDDEN_KEY_PATTERN = re.compile(r"(?i)(token|api[_-]?key|cookie|password|passwd|secret|connection[_-]?string|nodeId)")
+
+# ---- §4.6 问题描述写法：员工可读性硬校验（首句 + 明细两段式） ----
+PROBLEM_HEADLINE_MAX = 60
+PROBLEM_DETAIL_MAX_LINES = 4
+PROBLEM_DETAIL_MIN_LINES = 2
+PROBLEM_DETAIL_LINE_MAX = 80
+PROBLEM_TEXT_MAX = 420
+PROBLEM_HEADLINE_FORBIDDEN_LABEL = "规则编号/内部代号"
+PROBLEM_SENTENCE_TERMINATORS = "。；！？"
+PROBLEM_LOCATOR_ANCHOR_PATTERN = re.compile(
+    r"(?<!\d)(?:\.[A-Za-z]{2,5}(?![A-Za-z0-9])"
+    r"|(?<![A-Za-z0-9])[A-Za-z]{1,3}\d{1,4}(?::[A-Za-z]{1,3}\d{1,4})?"
+    r"|!\s*\S)"
+    r"|第\s*\d+\s*[页条项]"
+    r"|「|」"
+)
+PROBLEM_HEADLINE_FORBIDDEN_PATTERNS = [
+    (re.compile(r"\b(?:RULE|CHK|KB|ISS)-[A-Za-z0-9][A-Za-z0-9._-]*"), PROBLEM_HEADLINE_FORBIDDEN_LABEL),
+    (re.compile(r"kb[_-]?id", re.IGNORECASE), PROBLEM_HEADLINE_FORBIDDEN_LABEL),
+    # 知识库相对路径形如 `06-规则库/…`：`/` 后必须是中文路径段，
+    # 否则区间值（0-50/51-100）与页码（L206-L302）会被误判（真实项目回测修正）。
+    (re.compile(r"\d{2}-[\u4e00-\u9fff][^\s，。；、]{0,}/"), "知识库相对路径"),
+]
+PROBLEM_DETAIL_FORBIDDEN = PROBLEM_HEADLINE_FORBIDDEN_PATTERNS[:2]
+# 首句是员工唯一的“一句话结论”，不得出现公式、区域坐标、文件!表 定位串或案例目录内相对路径；
+# 现象要用普通话描述，精确坐标放明细行。口径源自真实项目回测（ISS-DC-001 等 20 条坐标串堆叠）。
+PROBLEM_HEADLINE_TECHNICAL_PATTERN = re.compile(
+    r"=|\b(?:SUM|AVERAGE|IF|VLOOKUP)\("
+    r"|[A-Za-z]{1,3}\d{1,4}:[A-Za-z]{1,3}\d{1,4}"
+    r"|[^\s，。；]{2,}\.(?:xlsx|xls|docx|doc|pdf)!"
+    r"|(?:工作版|提取|材料-源|raw)/"
+)
+PROBLEM_TEXT_FORBIDDEN_PATTERNS = [
+    (re.compile(r"\d{2}-[\u4e00-\u9fff][^\s，。；、]{0,}/"), "知识库相对路径"),
+    (re.compile(r"(?i)\bnodeId\b"), "nodeId"),
+    (re.compile(r"file://"), "file:// 地址"),
+    (re.compile(r"(?:^|[^A-Za-z0-9])/(?:Users|home|var|tmp|private|Volumes|opt)/"), "绝对路径"),
+    (re.compile(r"\b[A-Za-z]:[\\/]"), "Windows 绝对路径"),
+]
 
 REQUIRED_TOP_LEVEL = [
     "schemaVersion",
@@ -458,6 +498,124 @@ def _parse_time(value: str):
         return None
 
 
+def split_problem_description(value) -> tuple:
+    """按 §4.6 把 problemDescription 拆为（首句, [明细行]）。
+
+    renderer 只做分段与呈现，不改写任何业务句子。校验器与渲染器共用同一解析口径。
+    """
+    if not isinstance(value, str):
+        return "", []
+    blocks = [block.strip() for block in value.split("\n") if block.strip()]
+    if not blocks:
+        return "", []
+    return blocks[0], blocks[1:]
+
+
+def _issue_location_anchors(issue: dict) -> list:
+    """收集本条问题真实存在的材料落点：材料证据文件名 + 建议修改文件名。"""
+    anchors = []
+    for bucket in ("materialEvidence", "recommendedEdits"):
+        items = issue.get(bucket)
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, dict) and _is_nonempty_str(item.get("displayName")):
+                anchors.append(str(item["displayName"]).strip())
+    return anchors
+
+
+def validate_problem_description(where: str, issue: dict) -> list:
+    """§4.6 问题描述写法硬校验：首句 + 明细两段式，员工可直接核对。
+
+    返回以 where 开头的错误字符串列表；空列表表示通过。
+    """
+    errors = []
+    raw = issue.get("problemDescription")
+    if not _is_nonempty_str(raw):
+        # 空值由字段必填校验统一报错，这里不重复报
+        return errors
+    text = str(raw)
+    headline, details = split_problem_description(text)
+    if not headline:
+        errors.append("{0}.problemDescription 缺少首句（须先一句话说清问题是什么）".format(where))
+        return errors
+    if len(headline) > PROBLEM_HEADLINE_MAX:
+        errors.append(
+            "{0}.problemDescription 首句 {1} 字，超过 {2} 字上限（首句只写问题是什么，其余内容移到明细行）".format(
+                where, len(headline), PROBLEM_HEADLINE_MAX
+            )
+        )
+    if headline[-1] not in PROBLEM_SENTENCE_TERMINATORS:
+        errors.append(
+            "{0}.problemDescription 首句未以句读收尾（须以 。；！？ 之一结束）".format(where)
+        )
+    if PROBLEM_HEADLINE_TECHNICAL_PATTERN.search(headline):
+        errors.append(
+            "{0}.problemDescription 首句含公式/单元格坐标/文件定位串，员工读不懂："
+            "首句用普通话写清现象，精确坐标移到明细行".format(where)
+        )
+    if len(details) < PROBLEM_DETAIL_MIN_LINES:
+        errors.append(
+            "{0}.problemDescription 必须是两段式：明细 {1} 行，少于 {2} 行下限".format(
+                where, len(details), PROBLEM_DETAIL_MIN_LINES
+            )
+        )
+    if len(details) > PROBLEM_DETAIL_MAX_LINES:
+        errors.append(
+            "{0}.problemDescription 明细 {1} 行，超过 {2} 行上限".format(
+                where, len(details), PROBLEM_DETAIL_MAX_LINES
+            )
+        )
+    for position, detail in enumerate(details, start=2):
+        if len(detail) > PROBLEM_DETAIL_LINE_MAX:
+            errors.append(
+                "{0}.problemDescription 明细第 {1} 行 {2} 字，超过 {3} 字上限（请拆成短句）".format(
+                    where, position - 1, len(detail), PROBLEM_DETAIL_LINE_MAX
+                )
+            )
+        if detail[-1] in PROBLEM_SENTENCE_TERMINATORS:
+            continue
+        if PROBLEM_LOCATOR_ANCHOR_PATTERN.search(detail):
+            # 以文件名/单元格/页码等落点收尾的明细行本身就是可核对指令，不强行加句号
+            continue
+        errors.append(
+            "{0}.problemDescription 明细第 {1} 行既未以句读收尾（。；！？），"
+            "也未以文件、sheet、单元格或页码等可核对落点收尾".format(where, position - 1)
+        )
+    if len(text) > PROBLEM_TEXT_MAX:
+        errors.append(
+            "{0}.problemDescription 共 {1} 字，超过 {2} 字上限（规则要求与判定链放 gapAnalysis）".format(
+                where, len(text), PROBLEM_TEXT_MAX
+            )
+        )
+    for pattern, label in PROBLEM_HEADLINE_FORBIDDEN_PATTERNS:
+        if pattern.search(headline):
+            errors.append(
+                "{0}.problemDescription 首句含{1}，员工看不懂：请改为具体现象，编号与路径放规则依据".format(where, label)
+            )
+    for pattern, label in PROBLEM_DETAIL_FORBIDDEN:
+        if pattern.search(" ".join(details)):
+            errors.append(
+                "{0}.problemDescription 明细含{1}，请移除（规则出处放「展开判断依据与规则」）".format(where, label)
+            )
+    for pattern, label in PROBLEM_TEXT_FORBIDDEN_PATTERNS:
+        if pattern.search(text):
+            errors.append("{0}.problemDescription 含{1}，禁止出现在员工交付内容中".format(where, label))
+
+    anchors = _issue_location_anchors(issue)
+    detail_text = " ".join(details)
+    has_anchor = any(anchor and anchor in detail_text for anchor in anchors) or bool(
+        PROBLEM_LOCATOR_ANCHOR_PATTERN.search(detail_text)
+    )
+    if not has_anchor:
+        errors.append(
+            "{0}.problemDescription 明细未给出可核对的文件与位置："
+            "请写明本次材料中的具体文件名（如 报告.docx、评估说明.xlsx），以及 sheet 名、"
+            "单元格/区域、第 N 页或章节名".format(where)
+        )
+    return errors
+
+
 def validate(result: dict, rendered: bool = False, expect_renderer: bool = False):
     errors = []
     for key in REQUIRED_TOP_LEVEL:
@@ -529,7 +687,6 @@ def validate(result: dict, rendered: bool = False, expect_renderer: bool = False
             errors.append("issueId 重复：{0}".format(issue_id))
         else:
             seen_issue_ids.add(issue_id)
-            where = "{0}({1})".format(where, issue_id)
         for field, label in (("severity", "severity"), ("issueType", "issueType"), ("decision", "decision")):
             value = issue.get(field)
             table = {"severity": SEVERITY_LABEL, "issueType": ISSUE_TYPE_LABEL, "decision": DECISION_LABEL}[field]
@@ -538,6 +695,7 @@ def validate(result: dict, rendered: bool = False, expect_renderer: bool = False
         for field in ("title", "problemDescription", "handlingRequirement", "locationSummary", "module"):
             if not _is_nonempty_str(issue.get(field)):
                 errors.append("{0}.{1} 不得为空".format(where, field))
+        errors.extend(validate_problem_description(where, issue))
 
         severity = issue.get("severity")
         if severity in severity_counts and issue.get("decision") == "fail":
@@ -1310,6 +1468,53 @@ def _ai_only_summary(issues, comparison) -> str:
     return "".join(parts)
 
 
+def _problem_block(value) -> str:
+    """§4.6 问题描述按两段式分行呈现：首句单行突出 + 明细逐行，不拼接、不改写。"""
+    headline, details = split_problem_description(value)
+    if not headline and not details:
+        return '<p class="problem"><span class="problem-label">问题描述</span>{0}</p>'.format(_text(EMPTY_TEXT))
+    parts = ['<div class="problem"><span class="problem-label">问题描述</span>']
+    if headline:
+        parts.append('<p class="problem-headline">{0}</p>'.format(_span("problem-description", headline)))
+    if details:
+        parts.append('<ul class="problem-details">')
+        for detail in details:
+            parts.append("<li>{0}</li>".format(_text(detail)))
+        parts.append("</ul>")
+    parts.append("</div>")
+    return "".join(parts)
+
+
+def _issue_location_block(issue: dict) -> str:
+    """把 JSON 中的定位摘要与材料证据落点组合成可扫描面板。"""
+    seen = set()
+    locations = []
+    for evidence in issue.get("materialEvidence") or []:
+        file_name = str(evidence.get("displayName") or "").strip()
+        locator = str(evidence.get("locator") or "").strip()
+        key = (file_name, locator)
+        if not file_name or not locator or key in seen:
+            continue
+        seen.add(key)
+        locations.append(key)
+    parts = ['<section class="issue-location-panel" aria-label="问题位置">']
+    parts.append('<p class="issue-location-heading">{0}</p>'.format(
+        _text("问题位置 · 请到以下位置核对")))
+    parts.append('<p class="issue-location-summary">{0}</p>'.format(
+        _text(issue.get("locationSummary"))))
+    if locations:
+        parts.append('<ul class="issue-location-list">')
+        for file_name, locator in locations:
+            parts.append(
+                '<li><span class="location-file">{0}</span>'
+                '<span class="location-arrow" aria-hidden="true">→</span>'
+                '<span class="location-locator">{1}</span></li>'.format(
+                    _text(file_name), _text(locator)))
+        parts.append("</ul>")
+    parts.append("</section>")
+    return "".join(parts)
+
+
 def _issue_card(issue) -> str:
     ai_only = _is_ai_only_issue(issue)
     card_classes = ["issue-card", SEVERITY_CLASS.get(issue.get("severity"), "")]
@@ -1334,14 +1539,10 @@ def _issue_card(issue) -> str:
         _text("问题类型"), _text(ISSUE_TYPE_LABEL.get(issue.get("issueType"), issue.get("issueType")))))
     cards.append('<span class="meta-chip decision-label">{0}：{1}</span>'.format(
         _text("判定"), _text(DECISION_LABEL.get(issue.get("decision"), issue.get("decision")))))
-    cards.append('</div><p class="issue-location"><strong>{0}</strong>{1}</p>'.format(
-        _text("问题位置："), _text(issue.get("locationSummary"))))
+    cards.append('</div>')
     cards.append("</header>")
-    cards.append(
-        '<p class="problem">{0}{1}</p>'.format(
-            _span("problem-label", "问题描述"), _span("problem-description", issue.get("problemDescription"))
-        )
-    )
+    cards.append(_issue_location_block(issue))
+    cards.append(_problem_block(issue.get("problemDescription")))
 
     recommended_edits = issue.get("recommendedEdits") or []
     cards.append('<details class="issue-edits"><summary>{0}</summary>'.format(
@@ -2046,6 +2247,34 @@ def _summary_breakdown_section(rendered_result) -> str:
     return "".join(parts)
 
 
+def _summary_digest_group(label: str, items: list, css_class: str) -> str:
+    """用 JSON 既有标题与计数生成紧凑摘要，不创作新的业务判断。"""
+    visible = items[:SUMMARY_DIGEST_ITEM_LIMIT]
+    parts = ['<article class="summary-action-group {0}">'.format(css_class)]
+    parts.append('<h3><span>{0}</span><strong>{1}</strong></h3>'.format(_text(label), _text(len(items))))
+    if visible:
+        parts.append("<ul>")
+        parts.extend("<li>{0}</li>".format(_text(item.get("title"))) for item in visible)
+        if len(items) > SUMMARY_DIGEST_ITEM_LIMIT:
+            parts.append("<li>{0}</li>".format(
+                _text("另 {0} 项".format(len(items) - SUMMARY_DIGEST_ITEM_LIMIT))))
+        parts.append("</ul>")
+    else:
+        parts.append('<p class="empty">{0}</p>'.format(_text(EMPTY_TEXT)))
+    parts.append("</article>")
+    return "".join(parts)
+
+
+def _summary_action_digest(issues: list, manual_items: list) -> str:
+    high = [item for item in issues if item.get("severity") == "high"]
+    other = [item for item in issues if item.get("severity") != "high"]
+    return '<div class="summary-action-digest">{0}{1}{2}</div>'.format(
+        _summary_digest_group("优先处理", high, "priority"),
+        _summary_digest_group("继续核对", other, "follow-up"),
+        _summary_digest_group("人工确认", manual_items, "manual"),
+    )
+
+
 def render(result: dict, print_trail: bool = None) -> str:
     """确定性渲染：文本节点只来自受控标签或输入数据，不生成新的业务句子。"""
     rendered_result = json.loads(json.dumps(result, ensure_ascii=False))
@@ -2132,18 +2361,26 @@ def render(result: dict, print_trail: bool = None) -> str:
     parts.append('<section id="summary">')
     parts.append("<h2>{0}</h2>".format(_text("本次 AI 审核结论")))
     parts.append('<p class="banner">{0}</p>'.format(_text(OVERALL_LABEL.get(summary.get("overallDecision"), summary.get("overallDecision")))))
-    parts.append('<p>{0}</p>'.format(_span("narrative", summary.get("narrative"))))
     parts.append('<div class="summary-kpis">')
-    for label, value, cls in (
-        ("AI 检出问题", counts.get("issuesTotal"), "danger"),
-        ("待人工确认", counts.get("pendingConfirmation"), "warning"),
-        ("未检查项", counts.get("notChecked"), "neutral"),
-        ("命中率", _format_rate(review_metrics["hitRate"]) if review_items else "数据不足", "primary"),
-        ("实际未落实", unresolved_claims, "danger"),
+    for label, value, cls, href in (
+        ("AI 检出问题", counts.get("issuesTotal"), "danger", "#actionable-issues"),
+        ("待人工确认", counts.get("pendingConfirmation"), "warning", "#manual-confirmation-items"),
+        ("未检查项", counts.get("notChecked"), "neutral", "#not-checked-items"),
+        ("命中率", _format_rate(review_metrics["hitRate"]) if review_items else "数据不足", "primary", None),
+        ("实际未落实", unresolved_claims, "danger", None),
     ):
-        parts.append('<div class="metric-card {0}"><span>{1}</span><strong>{2}</strong></div>'.format(
-            cls, _text(label), _text(value)))
+        if href:
+            parts.append(
+                '<a class="metric-card metric-link {0}" href="{1}"><span>{2}</span><strong>{3}</strong></a>'.format(
+                    cls, href, _text(label), _text(value)))
+        else:
+            parts.append('<div class="metric-card {0}"><span>{1}</span><strong>{2}</strong></div>'.format(
+                cls, _text(label), _text(value)))
     parts.append("</div>")
+    parts.append(_summary_action_digest(sorted_issues, manual_items))
+    parts.append(
+        '<details class="summary-narrative-details"><summary>{0}</summary><p>{1}</p></details>'.format(
+            _text("查看完整 AI 审核说明"), _span("narrative", summary.get("narrative"))))
     parts.append(_header_hit_rate_caliber(rendered_result.get("reviewComparison") or {}))
     parts.append('<details class="summary-details"><summary>{0}</summary>{1}</details>'.format(
         _text("展开问题分布与核验概览"), _summary_breakdown_section(rendered_result)))
@@ -2160,20 +2397,20 @@ def render(result: dict, print_trail: bool = None) -> str:
         parts.append('<p class="empty">{0}</p>'.format(_text(EMPTY_TEXT)))
     parts.append("</section>")
 
-    # 04 AI 外部数据核验
-    parts.append(_external_data_section(rendered_result.get("externalDataVerification")))
-
-    # 05 人工复核对照
-    parts.append(_review_comparison_section(comparison))
-
-    # 06 AI 审核表现评分卡（按明细重算）
-    parts.append(_scorecard_section(comparison, result.get("selfAuditErrors") or []))
-
-    # 07 需要人工确认事项
+    # 04 需要人工确认事项
     parts.append('<section id="manual-confirmation-items">')
     parts.append("<h2>{0}</h2>".format(_text("需要人工确认事项")))
     parts.append(_list_block(manual_items, _manual_item, empty_text=EMPTY_TEXT))
     parts.append("</section>")
+
+    # 05 AI 外部数据核验
+    parts.append(_external_data_section(rendered_result.get("externalDataVerification")))
+
+    # 06 人工复核对照
+    parts.append(_review_comparison_section(comparison))
+
+    # 07 AI 审核表现评分卡（按明细重算）
+    parts.append(_scorecard_section(comparison, result.get("selfAuditErrors") or []))
 
     # 08 本次审核依据（默认收起）
     parts.append('<section id="audit-basis">')
@@ -2217,6 +2454,7 @@ def render(result: dict, print_trail: bool = None) -> str:
     parts.append("</tbody></table>")
     parts.append("<h4>{0}</h4>".format(_text("检查域")))
     parts.append("<ul>" + "".join("<li>{0}</li>".format(_text(domain)) for domain in (scope.get("checkDomains") or [])) + "</ul>")
+    parts.append('<div id="not-checked-items">')
     parts.append("<h4>{0}</h4>".format(_text("未检查项")))
     not_checked = scope.get("notCheckedItems") or []
     if not_checked:
@@ -2230,6 +2468,7 @@ def render(result: dict, print_trail: bool = None) -> str:
         parts.append("</tbody></table>")
     else:
         parts.append('<p class="empty">{0}</p>'.format(_text(EMPTY_TEXT)))
+    parts.append("</div>")
     limitations = scope.get("limitations") or []
     if limitations:
         parts.append("<h4>{0}</h4>".format(_text("能力边界")))
@@ -2319,6 +2558,36 @@ def render(result: dict, print_trail: bool = None) -> str:
 # --------------------------------------------------------------------------- #
 # CLI
 # --------------------------------------------------------------------------- #
+def embedded_result_from_document(document: str) -> dict:
+    match = re.search(
+        r'<script id="audit-result" type="application/json">(.*?)</script>',
+        document,
+        re.S,
+    )
+    if not match:
+        raise ValueError("HTML 缺少内嵌 AuditResult")
+    return json.loads(match.group(1))
+
+
+def _write_render_pair(html_path: Path, json_path: Path, document: str, rendered: dict) -> None:
+    """全部校验完成后再写临时文件，避免业务校验失败留下半成品。"""
+    if html_path.resolve() == json_path.resolve():
+        raise ValueError("HTML 与配套 JSON 输出路径不得相同")
+    html_path.parent.mkdir(parents=True, exist_ok=True)
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    html_temp = html_path.with_name(html_path.name + ".tmp")
+    json_temp = json_path.with_name(json_path.name + ".tmp")
+    try:
+        html_temp.write_text(document, encoding="utf-8")
+        json_temp.write_text(canonical_json(rendered) + "\n", encoding="utf-8")
+        json_temp.replace(json_path)
+        html_temp.replace(html_path)
+    finally:
+        for path in (html_temp, json_temp):
+            if path.exists():
+                path.unlink()
+
+
 def _cmd_validate(args) -> int:
     result = load_result(Path(args.path))
     errors = validate(result, rendered=args.rendered, expect_renderer=args.rendered)
@@ -2339,31 +2608,31 @@ def _cmd_digest(args) -> int:
 
 
 def _cmd_render(args) -> int:
-    path = Path(args.path)
-    result = load_result(path)
+    result = load_result(Path(args.path))
     errors = validate(result, rendered=False)
     if errors:
         for error in errors:
             print("ERROR: {0}".format(error), file=sys.stderr)
-        print("校验失败，拒绝渲染：{0} 项".format(len(errors)), file=sys.stderr)
+        print("JSON 校验失败，已退回修正，未生成 HTML：{0} 项".format(len(errors)), file=sys.stderr)
         return 1
     document = render(result)
-    out_path = Path(args.out)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(document, encoding="utf-8")
-    rendered = json.loads(re.search(r'<script id="audit-result" type="application/json">(.*?)</script>', document, re.S).group(1))
+    rendered = embedded_result_from_document(document)
     post_errors = validate(rendered, rendered=True, expect_renderer=True)
     if post_errors:
         for error in post_errors:
             print("ERROR: {0}".format(error), file=sys.stderr)
-        print("渲染后自检失败：{0} 项".format(len(post_errors)), file=sys.stderr)
+        print("渲染后自检失败，未写出交付文件：{0} 项".format(len(post_errors)), file=sys.stderr)
         return 1
+    out_path = Path(args.out)
+    json_out_path = Path(args.json_out)
+    _write_render_pair(out_path, json_out_path, document, rendered)
     print("已渲染：{0}".format(out_path))
+    print("已归档：{0}".format(json_out_path))
     return 0
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="CRWU AuditResult 校验与单文件 HTML 渲染（送达规范 v1.1）")
+    parser = argparse.ArgumentParser(description="CRWU AuditResult 校验与单文件 HTML 渲染（送达规范 v1.4）")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     validate_parser = subparsers.add_parser("validate", help="校验 AuditResult JSON")
@@ -2378,6 +2647,7 @@ def main(argv=None) -> int:
     render_parser = subparsers.add_parser("render", help="渲染自包含单文件 HTML")
     render_parser.add_argument("path", help="AuditResult JSON 路径")
     render_parser.add_argument("--out", required=True, help="输出 HTML 路径")
+    render_parser.add_argument("--json-out", required=True, help="输出与 HTML 内嵌对象完全一致的 AuditResult JSON")
     render_parser.set_defaults(func=_cmd_render)
 
     args = parser.parse_args(argv)

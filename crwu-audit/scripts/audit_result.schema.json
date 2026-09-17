@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://crwu.local/schema/audit-result/1.0.0",
   "title": "AuditResult",
-  "description": "CRWU 审核意见送达规范 v1.1 §9 统一 AuditResult JSON 数据结构（机器可校验 Schema；语义重算规则见同目录 audit_delivery.py 与规范 §9.4）。",
+  "description": "CRWU 审核意见送达规范 v1.4 §9 统一 AuditResult JSON 数据结构（机器可校验 Schema；语义重算规则见同目录 audit_delivery.py 与规范 §9.4；HTML 及监控统计均由同一对象派生）。",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -108,6 +108,7 @@
     },
     "summary": {
       "type": "object",
+      "description": "审核总结事实源。renderer 从既有问题与人工确认明细生成三行行动摘要；narrative 原文完整保留并默认折叠，不新增业务事实。",
       "required": [
         "overallDecision",
         "narrative",
@@ -123,10 +124,12 @@
         },
         "narrative": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "完整 AI 审核说明；员工页面默认折叠展示，行动摘要从 issues[] 与 manualConfirmationItems[] 确定性派生。"
         },
         "counts": {
           "type": "object",
+          "description": "首屏计数事实源；各值必须可由 issues[]、manualConfirmationItems[] 与 scope.notCheckedItems[] 重算。",
           "required": [
             "issuesTotal",
             "fail",
@@ -206,7 +209,8 @@
           },
           "locationSummary": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "员工定位问题的首要位置摘要；HTML 与 materialEvidence[] 的文件名、locator 共同组成醒目的问题位置面板。"
           },
           "severity": {
             "enum": [
@@ -231,7 +235,9 @@
           },
           "problemDescription": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 420,
+            "description": "员工首屏必读字段，写法见送达规范 §4.6（两段式）：第一段为首句结论（一句话说清问题是什么，≤60 字，以 。；！？ 收尾，不得含规则编号/知识库路径/内部代号）；其后另起一行为明细，共 2–4 行、每行 ≤80 字，写明差异是什么与去哪个文件、sheet、单元格、页码核对，明细须给出本次材料的可核对落点。规则条款与完整判定链放 gapAnalysis 与 ruleEvidence，不得写入本字段。"
           },
           "handlingRequirement": {
             "type": "string",
