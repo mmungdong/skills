@@ -163,6 +163,25 @@
     .issue-card.sev-low { border-left-color: var(--low); }
     .issue-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 9px 12px; }
     .issue-title-row h3 { flex: 1 1 320px; margin-bottom: 0; }
+    .item-index {
+      display: inline-flex;
+      flex: 0 0 auto;
+      align-items: center;
+      min-height: 27px;
+      padding: 3px 9px;
+      color: #fff;
+      background: var(--brand);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .item-heading, .review-item-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+    .item-heading h4, .review-item-heading h4 { flex: 1 1 280px; margin: 0; color: #203b59; font-size: 15px; }
+    .numbered-card-list { margin: 0; padding: 0; list-style: none; }
+    .numbered-card-list > li { margin: 16px 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
     .ai-only-badge {
       display: inline-flex;
       align-items: center;
@@ -269,17 +288,40 @@
     .summary-action-group.manual { border-top-color: var(--medium); }
     .summary-action-group h3 { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
     .summary-action-group h3 strong { font-size: 19px; font-variant-numeric: tabular-nums; }
-    .summary-action-group ul { margin-bottom: 0; }
+    .summary-action-list { margin-bottom: 0; padding-left: 24px; }
     .summary-action-group li { font-size: 13px; }
     .summary-narrative-details { margin: 12px 0 0; }
     .formula { padding: 10px 12px; color: #445468; background: #f3f6f9; border-left: 3px solid #8aa6bc; border-radius: 6px; font-size: 13px; }
-    .closure-alert { padding: 13px 14px; color: #8a231f; background: var(--high-soft); border: 1px solid #e1aaa7; border-radius: 8px; }
+    .summary-closure-alert, .closure-alert {
+      display: block;
+      padding: 13px 14px;
+      color: #7a1f1a;
+      background: #fff0ee;
+      border: 1px solid #d99692;
+      border-left: 5px solid var(--high);
+      border-radius: 8px;
+      font-weight: 800;
+    }
+    .summary-closure-alert { margin: 12px 0; text-decoration: none; transition: background-color 160ms ease, border-color 160ms ease; }
+    .summary-closure-alert:hover, .summary-closure-alert:focus-visible { background: #ffe6e3; border-color: var(--high); }
+    .external-applicability {
+      margin: 12px 0;
+      padding: 16px;
+      border: 1px solid #bfd5c7;
+      border-left: 5px solid var(--good);
+      border-radius: 9px;
+      background: #f2f8f4;
+    }
+    .external-applicability h3 { margin: 0 0 10px; color: #235d3a; }
+    .external-applicability .kv { margin-bottom: 0; background: #fff; }
     .review-file-list { padding: 0; list-style: none; counter-reset: none; }
     .review-file-list li { display: grid; grid-template-columns: 32px minmax(0,1fr) auto auto; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
     .review-file-list .order { display: grid; place-items: center; width: 26px; height: 26px; color: #fff; background: var(--brand); border-radius: 50%; }
     .review-level { padding: 14px; background: #fbfcfe; border: 1px solid var(--line); border-radius: 10px; }
     .level-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
     .level-summary span { padding: 5px 9px; background: #fff; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+    .level-summary .level-alert-tag, .closure-tag { color: #7a1f1a; background: #fff0ee; border-color: #d99692; font-weight: 800; }
+    .closure-tag { display: inline-flex; align-items: center; min-height: 27px; padding: 3px 9px; border: 1px solid #d99692; border-radius: 999px; font-size: 12px; }
     .review-item { margin: 14px 0; padding: 12px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
     .review-item-unclosed { border-left: 4px solid var(--high); background: var(--high-soft); }
     .score-hero { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-bottom: 12px; }

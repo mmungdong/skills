@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://crwu.local/schema/audit-result/1.0.0",
+  "$id": "https://crwu.local/schema/audit-result/1.2.0",
   "title": "AuditResult",
-  "description": "CRWU 审核意见送达规范 v1.4 §9 统一 AuditResult JSON 数据结构（机器可校验 Schema；语义重算规则见同目录 audit_delivery.py 与规范 §9.4；HTML 及监控统计均由同一对象派生）。",
+  "description": "CRWU 审核意见送达规范 v1.6 §9 统一 AuditResult JSON 数据结构（机器可校验 Schema；语义重算规则见同目录 audit_delivery.py 与规范 §9.4；HTML 及监控统计均由同一对象派生）。",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -1077,19 +1077,46 @@
     },
     "externalDataVerification": {
       "type": "object",
-      "description": "外部数据核验区（可选）：以报告基准日为锚，声明数据源可用性并逐项给出外部数据核验结论。唯一数据源为同花顺 iFinD（取数路径随宿主而异：WorkBuddy 宿主连接器 / DeepSeek Harness 的 ifind-finance-data 技能），不启用万得；数据源不可用时必须在 sources[] 显式声明并给出 unavailableDeclaration。",
+      "description": "外部数据核验区（可选）：先按知识库表 A 判断适用性。not_applicable 时只说明原因与依据，不探测来源；required 时以报告基准日为锚，使用同花顺 iFinD 逐项核验，且仅在能力不可用时声明 unavailableDeclaration。",
       "required": [
+        "applicability",
         "baseDate",
         "sources"
       ],
       "properties": {
+        "applicability": {
+          "type": "object",
+          "description": "外部数据核验适用性前置判断。先按知识库 M-外部数据核验表 A 判断；仅 status=required 时才探测数据源并执行核验。",
+          "required": [
+            "status",
+            "reason",
+            "basis"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "required",
+                "not_applicable"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "basis": {
+              "type": "string",
+              "minLength": 1,
+              "description": "本次适用性判断引用的知识库路径与表/条款，例如 06-规则库/M-外部数据核验/01-模块-外部数据核验 · 表 A。"
+            }
+          }
+        },
         "baseDate": {
           "type": "string",
           "minLength": 1
         },
         "unavailableDeclaration": {
           "type": "string",
-          "description": "存在未配置/未认证数据源时必须填写（兜底声明由数据提供方写入，渲染器不自造句子）"
+          "description": "仅 applicability.status=required 且存在未配置/未认证数据源时填写（兜底声明由数据提供方写入，渲染器不自造句子）；not_applicable 时禁止填写。"
         },
         "sources": {
           "type": "array",

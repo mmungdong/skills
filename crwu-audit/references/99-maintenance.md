@@ -19,6 +19,7 @@
 | A/B/C 机构审核风险分类 | `09-review-risk-classification.md` |
 | 能力 gap 与待建提案 | `10-capability-gap-proposal.md` |
 | 送达与交付层规范（AuditResult/单文件 HTML、双证据链、两阶段门禁、验收清单） | `11-html-delivery-spec.md` |
+| 最终 AuditResult 的钉钉组织门禁、年月归档、文件命名与上传验证 | `13-dingtalk-result-publish.md` |
 | HTML 页面结构、左侧目录、CSS 与打印样式 | `template/audit-report.html` |
 | 总体 workflow、加载指针与输出步骤 | `SKILL.md` |
 

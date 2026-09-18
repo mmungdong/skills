@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AuditResult 校验与 HTML 渲染的契约测试（送达规范 v1.4）。
+"""AuditResult 校验与 HTML 渲染的契约测试（送达规范 v1.6）。
 
 运行：在技能目录内 `python3 scripts/test_audit_delivery.py`
 本测试**自洽**：只依赖本技能 `scripts/` 内的脚本、schema 与样例，可随技能一起安装。
@@ -623,6 +623,19 @@ class AuditResultRenderTest(unittest.TestCase):
             ),
         )
 
+    def test_issue_related_sections_show_visible_sequence_numbers(self):
+        document = delivery.render(with_structured_review_comparison())
+        for label in (
+            "问题 01/02",
+            "问题 02/02",
+            "确认 01/01",
+            "复核 01/04",
+            "复核 04/04",
+            "未检查 01/01",
+        ):
+            self.assertIn('<span class="item-index">{0}</span>'.format(label), document)
+        self.assertIn('<ol class="summary-action-list">', document)
+
     def test_action_kpis_link_to_their_json_backed_sections(self):
         document = delivery.render(load_sample())
         for href, label, value in (
@@ -847,6 +860,9 @@ class AuditResultRenderTest(unittest.TestCase):
                 r".+复核：[0-9]+ 条意见",
                 r"展开.+复核意见（共 [0-9]+ 条）",
                 r"：[0-9]+ 条，须优先回客户。",
+                r"已称修复但实际未落实：[0-9]+ 条，须优先回客户。?",
+                r"(问题|确认|复核|未检查) [0-9]+/[0-9]+",
+                r"实际未落实 [0-9]+",
                 r"命中率：\([0-9]+ \+ [0-9]+\) ÷ [0-9]+ = [0-9]+(?:\.[0-9])?%；精确命中率：[0-9]+(?:\.[0-9])?%。部分命中计为命中、只是层次较低；已验证修改和无法核验项不进入分母。",
                 r"命中率：\([0-9]+ \+ [0-9]+\) ÷ [0-9]+。部分命中计为命中、只是层次较低；已验证修改和无法核验项不进入分母；综合值按全部有效明细汇总，不取各维度百分比平均。",
                 r"(精确命中|部分命中|未命中)：[0-9]+ / [0-9]+（[0-9]+(?:\.[0-9])?%）",
@@ -883,6 +899,11 @@ class ExternalDataVerificationTest(unittest.TestCase):
     def test_unavailable_source_is_declared_in_html(self):
         result = load_sample()
         verification = result["externalDataVerification"]
+        verification["applicability"] = {
+            "status": "required",
+            "reason": "报告引用了需要与公开市场数据核对的外部数据。",
+            "basis": "知识库 06-规则库/M-外部数据核验/01-模块-外部数据核验 · 表 A 触发范围",
+        }
         verification["sources"][0]["configured"] = False
         verification["sources"][0]["authenticated"] = False
         verification["sources"][0]["note"] = "两条取数路径都不可用；相关条目未经外部数据核验"
@@ -951,6 +972,57 @@ class ExternalDataVerificationTest(unittest.TestCase):
         document = delivery.render(result)
         self.assertIn('id="external-data-verification"', document)
         self.assertIn(delivery.EXT_DATA_EMPTY_TEXT, document)
+
+    def test_not_applicable_is_explained_without_source_configuration_warning(self):
+        result = load_sample()
+        verification = result["externalDataVerification"]
+        verification["applicability"] = {
+            "status": "not_applicable",
+            "reason": "本报告仅采用成本法，未采用或参考收益法、市场法，不满足方法线。",
+            "basis": "知识库 06-规则库/M-外部数据核验/01-模块-外部数据核验 · 表 A 触发范围（业务线 × 资产线 × 方法线三条同时成立）",
+        }
+        verification["sources"] = []
+        verification["checks"] = []
+        verification.pop("unavailableDeclaration", None)
+        errors = delivery.validate(result)
+        self.assertEqual([], errors)
+        document = delivery.render(result)
+        section = document[
+            document.find('id="external-data-verification"'):
+            document.find("</section>", document.find('id="external-data-verification"'))
+        ]
+        self.assertIn("本报告暂不涉及外部数据核验", section)
+        self.assertIn(verification["applicability"]["reason"], section)
+        self.assertIn(verification["applicability"]["basis"], section)
+        self.assertNotIn("未配置", section)
+        self.assertNotIn("未认证", section)
+        self.assertNotIn("数据源可用性", section)
+
+        summary = document[document.find('id="summary"'):document.find("</section>", document.find('id="summary"'))]
+        self.assertIn("外部数据核验结果", summary)
+        self.assertIn("不适用", summary)
+
+    def test_applicability_judgment_is_required(self):
+        result = load_sample()
+        result["externalDataVerification"].pop("applicability", None)
+        errors = delivery.validate(result)
+        self.assertIn("externalDataVerification.applicability", "\n".join(errors))
+
+    def test_not_applicable_must_not_carry_sources_checks_or_unavailable_declaration(self):
+        result = load_sample()
+        verification = result["externalDataVerification"]
+        verification["applicability"] = {
+            "status": "not_applicable",
+            "reason": "本报告不满足知识库表 A 的三线触发条件。",
+            "basis": "知识库 06-规则库/M-外部数据核验/01-模块-外部数据核验 · 表 A 触发范围",
+        }
+        verification["unavailableDeclaration"] = "未配置/未认证 同花顺 iFinD，相关条目未经外部数据核验。"
+        errors = delivery.validate(result)
+        joined = "\n".join(errors)
+        self.assertIn("not_applicable", joined)
+        self.assertIn("sources", joined)
+        self.assertIn("checks", joined)
+        self.assertIn("unavailableDeclaration", joined)
 
     def test_required_fields_are_enforced(self):
         result = load_sample()
@@ -1281,6 +1353,36 @@ class StructuredReviewComparisonTest(unittest.TestCase):
         self.assertIn("项目答复.docx", document)
         self.assertIn("仍未见时间修正依据", document)
 
+    def test_unclosed_claim_is_promoted_to_summary_and_review_heading(self):
+        document = delivery.render(with_structured_review_comparison())
+        summary_start = document.find('id="summary"')
+        summary_end = document.find('</section>', summary_start)
+        summary = document[summary_start:summary_end]
+        self.assertIn('class="summary-closure-alert"', summary)
+        self.assertIn('href="#review-unclosed-alert"', summary)
+        self.assertIn("已称修复但实际未落实：1 条，须优先回客户", summary)
+
+        review_start = document.find('id="review-comparison"')
+        review = document[review_start:]
+        heading = review.find("人工复核对照")
+        alert = review.find('id="review-unclosed-alert"')
+        capability = review.find('class="formula capability-notice"')
+        self.assertGreater(alert, heading)
+        self.assertLess(alert, capability)
+
+    def test_unclosed_review_item_and_level_summary_are_tagged(self):
+        document = delivery.render(with_structured_review_comparison())
+        first_level_start = document.find("一级复核：2 条意见")
+        second_level_start = document.find("二级复核：2 条意见")
+        first_level = document[first_level_start:second_level_start]
+        second_level = document[second_level_start:document.find('class="review-out-of-scope"', second_level_start)]
+        self.assertNotIn("实际未落实 1", first_level)
+        self.assertIn('<span class="level-alert-tag">实际未落实 1</span>', second_level)
+        self.assertIn(
+            '<span class="closure-tag">闭环异常｜称已修复但实际未修改</span>',
+            second_level,
+        )
+
     def test_objective_scorecard_shows_review_level_module_and_weighted_total(self):
         document = delivery.render(with_structured_review_comparison())
         self.assertIn("AI 审核表现评分卡", document)
@@ -1384,7 +1486,7 @@ class AiScorecardTest(unittest.TestCase):
 class DeliveryContractDocumentationTest(unittest.TestCase):
     """送达版本、JSON-first 命令和展示映射必须在安装包内同步。"""
 
-    def test_v14_contract_versions_and_json_first_terms_are_synchronized(self):
+    def test_v16_contract_versions_and_json_first_terms_are_synchronized(self):
         skill_root = Path(__file__).resolve().parent.parent
         repo_root = skill_root.parents[1]
         spec = (skill_root / "references" / "11-html-delivery-spec.md").read_text(encoding="utf-8")
@@ -1393,9 +1495,9 @@ class DeliveryContractDocumentationTest(unittest.TestCase):
         skills_readme = (repo_root / "skills" / "README.md").read_text(encoding="utf-8")
         changelog = (repo_root / "docs" / "CHANGELOG.md").read_text(encoding="utf-8")
 
-        self.assertEqual("renderer/1.2.4", delivery.RENDERER_VERSION)
+        self.assertEqual("renderer/1.2.6", delivery.RENDERER_VERSION)
         for content in (spec, scripts_readme, skill, skills_readme, changelog):
-            self.assertIn("v1.4", content)
+            self.assertIn("v1.6", content)
         for content in (spec, scripts_readme, skill):
             self.assertIn("--json-out", content)
             self.assertIn("JSON 校验", content)
@@ -1404,6 +1506,7 @@ class DeliveryContractDocumentationTest(unittest.TestCase):
         self.assertIn("issues[].materialEvidence[]", spec)
         self.assertIn("manualConfirmationItems[]", spec)
         self.assertIn("scope.notCheckedItems[]", spec)
+        self.assertIn("externalDataVerification.applicability.status", spec)
         self.assertIn("HTML 内嵌", spec)
 
 

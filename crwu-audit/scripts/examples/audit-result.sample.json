@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.1.0",
+  "schemaVersion": "1.2.0",
   "auditTask": {
     "projectId": "PRJ-2026-0001",
     "reportVersion": "v1.0",
@@ -251,6 +251,11 @@
     ]
   },
   "externalDataVerification": {
+    "applicability": {
+      "status": "required",
+      "reason": "报告采用市场法并引用公开市场数据，满足知识库表 A 的业务线、资产线与方法线触发条件。",
+      "basis": "知识库 06-规则库/M-外部数据核验/01-模块-外部数据核验 · 表 A 触发范围（业务线 × 资产线 × 方法线三条同时成立）"
+    },
     "baseDate": "2025-06-30",
     "sources": [
       {

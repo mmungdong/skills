@@ -23,6 +23,7 @@ EXPECTED_REFERENCE_FILES = (
     "10-capability-gap-proposal.md",
     "11-html-delivery-spec.md",
     "12-leaf-common-contract.md",
+    "13-dingtalk-result-publish.md",
     "99-maintenance.md",
 )
 
@@ -44,6 +45,7 @@ REQUIRED_ROUTER_TERMS = (
     "06-overlay-classification.md",
     "07-skill-registry.md",
     "08-union-dispatch-rules.md",
+    "13-dingtalk-result-publish.md",
 )
 
 REGISTRY_HEADER = ("axis", "label", "skill", "status", "load behavior")

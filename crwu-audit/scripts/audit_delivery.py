@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CRWU 审核意见交付工具：AuditResult 校验 + 单文件 HTML 渲染。
 
-实现《CRWU 审核意见 HTML 送达规范 v1.4》
+实现《CRWU 审核意见 HTML 送达规范 v1.6》
 （正文：本技能 references/11-html-delivery-spec.md）：
 
 - AuditResult JSON 是唯一事实源；HTML 仅如实呈现，不新增/删除/合并/改写任何结论；
@@ -24,7 +24,7 @@ import re
 import sys
 from pathlib import Path
 
-RENDERER_VERSION = "renderer/1.2.4"
+RENDERER_VERSION = "renderer/1.2.6"
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "template" / "audit-report.html"
 SCHEMA_VERSION_PREFIX = "1."
 
@@ -123,8 +123,10 @@ CONFIDENCE_LABEL = {"high": "高", "medium": "中", "low": "低"}
 REVIEW_STATUS_LABEL = {"not_performed": "未执行", "performed": "已执行"}
 
 EMPTY_TEXT = "本次无此类事项"
-EXT_DATA_EMPTY_TEXT = "本次未执行外部数据核验"
+EXT_DATA_EMPTY_TEXT = "本次未提供外部数据核验适用性判断"
 EXT_DATA_NO_CHECK_TEXT = "本次无可核验的外部数据项"
+EXT_DATA_NOT_APPLICABLE_TEXT = "本报告暂不涉及外部数据核验"
+EXT_DATA_APPLICABILITY_LABEL = {"required": "需要外部数据核验", "not_applicable": "不适用"}
 EXT_DATA_DECISIONS = ("符合", "不符合", "请说明", "未检查")
 EXT_DATA_UNAVAILABLE_TEXT = "不可用（未经外部数据核验）"
 EXT_DATA_NOT_FETCHED_TEXT = "未取数"
@@ -1404,6 +1406,15 @@ def _span(cls: str, value) -> str:
     return '<span class="{0}">{1}</span>'.format(cls, _text(value))
 
 
+def _item_index(label: str, index: int, total: int) -> str:
+    """生成分区内稳定序号；至少补齐两位，便于长列表扫描。"""
+    width = max(2, len(str(total)))
+    return _span(
+        "item-index",
+        "{0} {1}/{2}".format(label, str(index).zfill(width), str(total).zfill(width)),
+    )
+
+
 def _rows(pairs) -> str:
     return "".join(
         "<tr><th scope=\"row\">{0}</th><td>{1}</td></tr>".format(_text(label), _text(value))
@@ -1515,14 +1526,15 @@ def _issue_location_block(issue: dict) -> str:
     return "".join(parts)
 
 
-def _issue_card(issue) -> str:
+def _issue_card(issue, index: int, total: int) -> str:
     ai_only = _is_ai_only_issue(issue)
     card_classes = ["issue-card", SEVERITY_CLASS.get(issue.get("severity"), "")]
     if ai_only:
         card_classes.append("ai-only-issue")
     cards = ['<article class="{0}">'.format(" ".join(filter(None, card_classes)))]
     cards.append('<header class="issue-head">')
-    cards.append('<div class="issue-title-row"><h3>{0}</h3>'.format(_span("issue-title", issue.get("title"))))
+    cards.append('<div class="issue-title-row">{0}<h3>{1}</h3>'.format(
+        _item_index("问题", index, total), _span("issue-title", issue.get("title"))))
     if ai_only:
         cards.append('<span class="ai-only-badge">{0}</span>'.format(_text("AI 独立发现")))
     cards.append("</div>")
@@ -1649,10 +1661,11 @@ def _edit_item(edit) -> str:
     ).format(_text(edit.get("displayName")), _text(edit.get("locator")), _text(edit.get("action")))
 
 
-def _manual_item(item) -> str:
+def _manual_item(item, index: int, total: int) -> str:
     return (
-        "<h4>{0}</h4><table class=\"kv\">{1}</table>"
+        '<div class="item-heading">{0}<h4>{1}</h4></div><table class="kv">{2}</table>'
     ).format(
+        _item_index("确认", index, total),
         _text(item.get("title")),
         _rows(
             [
@@ -1752,7 +1765,7 @@ def _reviewer_only_item(item) -> str:
     ).format(_text(item.get("title")), _rows(rows))
 
 
-def _review_item_card(item) -> str:
+def _review_item_card(item, index: int, total: int) -> str:
     evidence = item.get("reviewerEvidence") or {}
     in_file = item.get("inFileEvidence") or {}
     closure = item.get("closureEvidence") or {}
@@ -1787,8 +1800,14 @@ def _review_item_card(item) -> str:
             ("答复原文", closure.get("quote")),
         ])
     alert_class = " review-item-unclosed" if resolution == "L-unclosed" else ""
-    return '<article class="review-item{0}"><h4>{1}</h4><table class="kv">{2}</table></article>'.format(
-        alert_class, _text(item.get("title")), _rows(rows))
+    tags = [_item_index("复核", index, total)]
+    if resolution == "L-unclosed":
+        tags.append('<span class="closure-tag">{0}</span>'.format(
+            _text("闭环异常｜称已修复但实际未修改")))
+    return (
+        '<article class="review-item{0}"><div class="review-item-heading">{1}<h4>{2}</h4></div>'
+        '<table class="kv">{3}</table></article>'
+    ).format(alert_class, "".join(tags), _text(item.get("title")), _rows(rows))
 
 
 def _review_comparison_section(comparison) -> str:
@@ -1805,7 +1824,11 @@ def _review_comparison_section(comparison) -> str:
         parts.append("</section>")
         return "".join(parts)
     metrics = _review_metrics(items)
+    item_positions = {id(item): index for index, item in enumerate(items, start=1)}
     unclosed = sum(item.get("inFileResolution") == "L-unclosed" for item in items)
+    if unclosed:
+        parts.append('<p id="review-unclosed-alert" class="closure-alert">{0}</p>'.format(
+            _text("已称修复但实际未落实：{0} 条，须优先回客户。".format(unclosed))))
     parts.append('<p class="formula capability-notice">{0}</p>'.format(_text(CAPABILITY_WORKPAPER_NOTICE)))
     parts.append('<p class="formula">{0}</p>'.format(
         _text("分母判定：AI 未命中的复核意见，须先核验该事项是否已被修改——" 
@@ -1829,9 +1852,6 @@ def _review_comparison_section(comparison) -> str:
         _text("部分命中计为命中、只是层次较低；已验证修改和无法核验项不进入分母。")))
     parts.append(_hit_level_row(metrics))
     parts.append(_excluded_from_denominator_block(comparison))
-    if unclosed:
-        parts.append('<p class="closure-alert"><strong>{0}</strong>{1}</p>'.format(
-            _text("已称修复但实际未落实"), _text("：{0} 条，须优先回客户。".format(unclosed))))
     parts.append('<h3>{0}</h3><ol class="review-file-list">'.format(_text("本次复核文件（按顺序）")))
     for entry in files:
         parts.append('<li><span class="order">{0}</span><strong>{1}</strong><span>{2}</span><span>{3}</span></li>'.format(
@@ -1844,9 +1864,10 @@ def _review_comparison_section(comparison) -> str:
     for level in seen_levels:
         level_items = [item for item in items if item.get("reviewLevel") == level]
         level_metrics = _review_metrics(level_items)
+        level_unclosed = sum(item.get("inFileResolution") == "L-unclosed" for item in level_items)
         parts.append('<section class="review-level"><h3>{0}</h3>'.format(
             _text("{0}：{1} 条意见".format(level, len(level_items)))))
-        parts.append('<div class="level-summary">{0}</div>'.format("".join(
+        level_summary = "".join(
             '<span><strong>{0}</strong>{1}</span>'.format(_text(label), _text(value))
             for label, value in (
                 ("已验证修改 ", level_metrics["resolved"]), ("AI 精确命中 ", level_metrics["exactHits"]),
@@ -1854,10 +1875,15 @@ def _review_comparison_section(comparison) -> str:
                 ("命中率 ", _format_rate(level_metrics["hitRate"])),
                 ("精确命中率 ", _format_rate(level_metrics["exactRate"])),
             )
-        )))
+        )
+        if level_unclosed:
+            level_summary += '<span class="level-alert-tag">{0}</span>'.format(
+                _text("实际未落实 {0}".format(level_unclosed)))
+        parts.append('<div class="level-summary">{0}</div>'.format(level_summary))
         parts.append('<details class="review-details"><summary>{0}</summary>'.format(
             _text("展开{0}意见（共 {1} 条）".format(level, len(level_items)))))
-        parts.extend(_review_item_card(item) for item in level_items)
+        for item in level_items:
+            parts.append(_review_item_card(item, item_positions[id(item)], len(items)))
         parts.append("</details></section>")
     parts.append(_out_of_scope_block(comparison))
     parts.append("</section>")
@@ -1926,10 +1952,11 @@ def _out_of_scope_block(comparison) -> str:
     return "".join(parts)
 
 
-def _not_checked_item(item) -> str:
+def _not_checked_item(item, index: int, total: int) -> str:
     return (
-        "<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td></tr>"
+        "<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td><td>{6}</td></tr>"
     ).format(
+        _item_index("未检查", index, total),
         _text(item.get("itemId")),
         _text(item.get("item")),
         _text(REASON_LABEL.get(item.get("reasonCode"), item.get("reasonCode"))),
@@ -1967,6 +1994,20 @@ def _validate_external_data(verification, errors):
     if not isinstance(verification, dict):
         errors.append("externalDataVerification 必须是对象")
         return
+    applicability = verification.get("applicability")
+    if not isinstance(applicability, dict):
+        errors.append("externalDataVerification.applicability 必须是对象并先完成适用性判断")
+        applicability = {}
+    status = applicability.get("status")
+    if status not in EXT_DATA_APPLICABILITY_LABEL:
+        errors.append(
+            "externalDataVerification.applicability.status 取值非法：{0}（仅允许 required / not_applicable）".format(
+                status
+            )
+        )
+    for field in ("reason", "basis"):
+        if not _is_nonempty_str(applicability.get(field)):
+            errors.append("externalDataVerification.applicability.{0} 不得为空".format(field))
     if not _is_nonempty_str(verification.get("baseDate")):
         errors.append("externalDataVerification.baseDate 不得为空（外部数据核验必须以报告基准日为锚）")
 
@@ -1996,7 +2037,16 @@ def _validate_external_data(verification, errors):
     if not isinstance(checks, list):
         errors.append("externalDataVerification.checks 必须是数组")
         return
-    if not sources and not checks:
+    if status == "not_applicable":
+        if sources:
+            errors.append("externalDataVerification.applicability.status=not_applicable 时 sources 必须为空")
+        if checks:
+            errors.append("externalDataVerification.applicability.status=not_applicable 时 checks 必须为空")
+        if _is_nonempty_str(verification.get("unavailableDeclaration")):
+            errors.append(
+                "externalDataVerification.applicability.status=not_applicable 时不得填写 unavailableDeclaration"
+            )
+    elif status == "required" and not sources and not checks:
         errors.append("externalDataVerification 至少要有 sources 或 checks 之一，不得空返")
 
     unavailable = [
@@ -2004,7 +2054,7 @@ def _validate_external_data(verification, errors):
         for item in sources
         if isinstance(item, dict) and not (item.get("configured") and item.get("authenticated"))
     ]
-    if unavailable and not _is_nonempty_str(verification.get("unavailableDeclaration")):
+    if status == "required" and unavailable and not _is_nonempty_str(verification.get("unavailableDeclaration")):
         errors.append(
             "externalDataVerification.unavailableDeclaration 在存在未配置 / 未认证数据源时不得为空"
             "（兜底声明须由数据提供方写入，渲染器不自造句子）"
@@ -2129,12 +2179,23 @@ def _external_data_checks_section(verification):
 
 
 def _external_data_section(verification) -> str:
-    """《外部数据核验》区：取数路径兜底声明 + 数据源可用性 + 逐项核验（正确/不正确都入表）。"""
+    """《外部数据核验》区：先展示适用性，再按需展示数据源与逐项核验。"""
     parts = ['<section id="external-data-verification">']
     parts.append("<h2>{0}</h2>".format(_text("AI 外部数据核验结果")))
     if not isinstance(verification, dict) or not verification:
         parts.append('<p class="empty">{0}</p>'.format(_text(EXT_DATA_EMPTY_TEXT)))
         parts.append("</section>")
+        return "".join(parts)
+
+    applicability = verification.get("applicability") or {}
+    if applicability.get("status") == "not_applicable":
+        parts.append('<div class="external-applicability not-applicable">')
+        parts.append('<h3>{0}</h3>'.format(_text(EXT_DATA_NOT_APPLICABLE_TEXT)))
+        parts.append('<table class="kv">{0}</table>'.format(_rows([
+            ("不适用原因", applicability.get("reason")),
+            ("外部核验范围依据", applicability.get("basis")),
+        ])))
+        parts.append("</div></section>")
         return "".join(parts)
 
     unavailable = [
@@ -2190,7 +2251,15 @@ def _summary_breakdown_section(rendered_result) -> str:
 
     verification = rendered_result.get("externalDataVerification") or {}
     checks = verification.get("checks") or []
-    if isinstance(checks, list) and checks:
+    applicability = verification.get("applicability") or {}
+    if applicability.get("status") == "not_applicable":
+        parts.append("<h4>{0}</h4>".format(_text("外部数据核验结果")))
+        parts.append(
+            '<table><tbody><tr><td>{0}</td><td>{1}</td></tr></tbody></table>'.format(
+                _text("适用性"), _text(EXT_DATA_APPLICABILITY_LABEL["not_applicable"])
+            )
+        )
+    elif isinstance(checks, list) and checks:
         counts = {}
         for check in checks:
             decision = str(check.get("decision") or "")
@@ -2253,12 +2322,12 @@ def _summary_digest_group(label: str, items: list, css_class: str) -> str:
     parts = ['<article class="summary-action-group {0}">'.format(css_class)]
     parts.append('<h3><span>{0}</span><strong>{1}</strong></h3>'.format(_text(label), _text(len(items))))
     if visible:
-        parts.append("<ul>")
+        parts.append('<ol class="summary-action-list">')
         parts.extend("<li>{0}</li>".format(_text(item.get("title"))) for item in visible)
         if len(items) > SUMMARY_DIGEST_ITEM_LIMIT:
             parts.append("<li>{0}</li>".format(
                 _text("另 {0} 项".format(len(items) - SUMMARY_DIGEST_ITEM_LIMIT))))
-        parts.append("</ul>")
+        parts.append("</ol>")
     else:
         parts.append('<p class="empty">{0}</p>'.format(_text(EMPTY_TEXT)))
     parts.append("</article>")
@@ -2361,13 +2430,16 @@ def render(result: dict, print_trail: bool = None) -> str:
     parts.append('<section id="summary">')
     parts.append("<h2>{0}</h2>".format(_text("本次 AI 审核结论")))
     parts.append('<p class="banner">{0}</p>'.format(_text(OVERALL_LABEL.get(summary.get("overallDecision"), summary.get("overallDecision")))))
+    if unresolved_claims:
+        parts.append('<a class="summary-closure-alert" href="#review-unclosed-alert">{0}</a>'.format(
+            _text("已称修复但实际未落实：{0} 条，须优先回客户".format(unresolved_claims))))
     parts.append('<div class="summary-kpis">')
     for label, value, cls, href in (
         ("AI 检出问题", counts.get("issuesTotal"), "danger", "#actionable-issues"),
         ("待人工确认", counts.get("pendingConfirmation"), "warning", "#manual-confirmation-items"),
         ("未检查项", counts.get("notChecked"), "neutral", "#not-checked-items"),
         ("命中率", _format_rate(review_metrics["hitRate"]) if review_items else "数据不足", "primary", None),
-        ("实际未落实", unresolved_claims, "danger", None),
+        ("实际未落实", unresolved_claims, "danger", "#review-unclosed-alert" if unresolved_claims else None),
     ):
         if href:
             parts.append(
@@ -2391,8 +2463,8 @@ def render(result: dict, print_trail: bool = None) -> str:
     parts.append("<h2>{0}</h2>".format(_text("AI 检出的问题项")))
     parts.append(_ai_only_summary(sorted_issues, comparison))
     if sorted_issues:
-        for issue in sorted_issues:
-            parts.append(_issue_card(issue))
+        for index, issue in enumerate(sorted_issues, start=1):
+            parts.append(_issue_card(issue, index, len(sorted_issues)))
     else:
         parts.append('<p class="empty">{0}</p>'.format(_text(EMPTY_TEXT)))
     parts.append("</section>")
@@ -2400,7 +2472,13 @@ def render(result: dict, print_trail: bool = None) -> str:
     # 04 需要人工确认事项
     parts.append('<section id="manual-confirmation-items">')
     parts.append("<h2>{0}</h2>".format(_text("需要人工确认事项")))
-    parts.append(_list_block(manual_items, _manual_item, empty_text=EMPTY_TEXT))
+    if manual_items:
+        parts.append('<ol class="numbered-card-list">')
+        for index, item in enumerate(manual_items, start=1):
+            parts.append("<li>{0}</li>".format(_manual_item(item, index, len(manual_items))))
+        parts.append("</ol>")
+    else:
+        parts.append('<p class="empty">{0}</p>'.format(_text(EMPTY_TEXT)))
     parts.append("</section>")
 
     # 05 AI 外部数据核验
@@ -2459,12 +2537,12 @@ def render(result: dict, print_trail: bool = None) -> str:
     not_checked = scope.get("notCheckedItems") or []
     if not_checked:
         parts.append(
-            '<table><thead><tr><th>{0}</th><th>{1}</th><th>{2}</th><th>{3}</th><th>{4}</th><th>{5}</th></tr></thead><tbody>'.format(
-                _text("编号"), _text("未检查项"), _text("原因码"), _text("原因"), _text("影响"), _text("需要的动作")
+            '<table><thead><tr><th>{0}</th><th>{1}</th><th>{2}</th><th>{3}</th><th>{4}</th><th>{5}</th><th>{6}</th></tr></thead><tbody>'.format(
+                _text("序号"), _text("编号"), _text("未检查项"), _text("原因码"), _text("原因"), _text("影响"), _text("需要的动作")
             )
         )
-        for item in not_checked:
-            parts.append(_not_checked_item(item))
+        for index, item in enumerate(not_checked, start=1):
+            parts.append(_not_checked_item(item, index, len(not_checked)))
         parts.append("</tbody></table>")
     else:
         parts.append('<p class="empty">{0}</p>'.format(_text(EMPTY_TEXT)))
@@ -2632,7 +2710,7 @@ def _cmd_render(args) -> int:
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="CRWU AuditResult 校验与单文件 HTML 渲染（送达规范 v1.4）")
+    parser = argparse.ArgumentParser(description="CRWU AuditResult 校验与单文件 HTML 渲染（送达规范 v1.6）")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     validate_parser = subparsers.add_parser("validate", help="校验 AuditResult JSON")

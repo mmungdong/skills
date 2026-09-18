@@ -1,15 +1,17 @@
 # CRWU 审核意见交付工具（AuditResult 校验 + 单文件 HTML 渲染）
 
-本目录实现《CRWU 审核意见 HTML 送达规范 v1.4》的**机器可校验 Schema**、**校验器**与**确定性 renderer**。
+本目录实现《CRWU 审核意见 HTML 送达规范 v1.6》的**机器可校验 Schema**、**校验器**与**确定性 renderer**。
 规范正文（唯一事实源）：本技能 `references/11-html-delivery-spec.md`。
 
 | 文件 | 作用 | 对应规范 |
 | --- | --- | --- |
 | `audit_result.schema.json` | AuditResult JSON Schema（draft 2020-12）：必填、枚举、条件必填、路径安全 | §9.1–§9.3 |
 | `audit_delivery.py` | 校验器 + renderer（纯标准库，无第三方依赖）；`validate` / `digest` / `render` 子命令 | §9.4、§10、§11.1、§12.2 |
+| `upload_audit_result.py` | 最终态 AuditResult 钉钉回传：固定组织/空间/结果目录，按审核年月归档并写后验证 | `references/13-dingtalk-result-publish.md` |
 | `template/audit-report.html`（从技能根目录定位） | 独立 HTML/CSS 模板：左侧目录、响应式正文、折叠轨迹与 A4 打印 | §10、附录 B |
 | `examples/audit-result.sample.json` | 【示意】样例（数值与名称为占位，禁止当真值使用） | §9.3 |
 | `test_audit_delivery.py` | 契约测试（Schema 语义、门禁、证据链、统计可重算、隐私、模板、目录、渲染确定性、转义、打印、空态） | §13.4 |
+| `test_upload_audit_result.py` | 钉钉回传契约测试（组织门禁、年月目录、时间戳命名、重名保护、最终态门禁） | `references/13-dingtalk-result-publish.md` |
 
 ## 用法
 
@@ -28,8 +30,12 @@ python3 scripts/audit_delivery.py render scripts/examples/audit-result.sample.js
 # 校验渲染后状态（要求 fileTrace 摘要已回填）
 python3 scripts/audit_delivery.py validate <rendered.json> --rendered
 
+# 最终态监控 JSON 回传钉钉（只允许自动创建 YYYY/MM）
+python3 scripts/upload_audit_result.py 审核结果.PRJ-2026-0001.json
+
 # 契约测试
 python3 scripts/test_audit_delivery.py
+python3 scripts/test_upload_audit_result.py
 ```
 
 退出码：`0` 通过；`1` 校验失败（错误逐条打印到 stderr，且**拒绝渲染**）。`render` 严格先做 JSON 校验；
@@ -74,6 +80,7 @@ python3 scripts/test_media_extract.py
 | 阶段二收口（router 步骤 14 ①） | `validate 审核意见.<项目ID>.json` | 失败 → 停止交付、逐条报错，禁止绕过或删检查 |
 | 阶段二收口（router 步骤 14 ②） | `render … --out 审核意见.<项目ID>.html --json-out 审核结果.<项目ID>.json`（内置 JSON 校验与渲染后自检） | 失败 → HTML 与配套 JSON 均不产出，记 capability gap，**不得跳过 JSON 校验出 HTML** |
 | 交付（router 步骤 14 ③） | 员工侧交付 HTML；内部监控读取配套 JSON，且该 JSON 与 HTML 内嵌对象逐字段一致 | — |
+| 钉钉回传（router 步骤 15） | `python3 scripts/upload_audit_result.py 审核结果.<项目ID>.json` | 失败 → 保留本地交付件并报告真实原因；不得换组织、猜目录或覆盖同名文件 |
 
 `digest`、`render` 共用同一规范化序列化（排序键、UTF-8、无多余空白），故冻结指纹可复现，且可与
 `fileTrace.sourceDigest` 互校；脚本仅依赖 Python 标准库。
@@ -88,8 +95,11 @@ python3 scripts/test_media_extract.py
   不拿修改建议冒充问题位置。
 - 三张计数卡分别跳转到问题项、人工确认和 `scope.notCheckedItems[]` 对应区块；
   「需要人工确认事项」紧跟「AI 检出的问题项」，方便连续处理。
+- AI 问题、人工确认、复核意见和未检查项均显示区内连续序号；稳定业务 ID 仍从 JSON 原样保留。
+- `L-unclosed` 完全由 `reviewItems[].inFileResolution` 驱动：首屏结论给出直达告警，《人工复核对照》标题下前置总数，各级摘要与具体条目同步显示异常标签。
+- 外部数据核验先读取 `externalDataVerification.applicability`：`not_applicable` 显示“不适用”、原因和知识库依据，且不显示数据源告警；只有 `required` 才展示来源可用性与逐项核验结果。
 
-这些展示均由最终配套 JSON 确定性派生；renderer 不新增业务字段，`schemaVersion` 仍为 `1.1.0`。
+这些展示均由最终配套 JSON 确定性派生；renderer 不新增业务字段，`schemaVersion` 为 `1.2.0`。
 
 ## 校验器覆盖的强制规则（§9.4 / §11.1 / §12.2）
 
@@ -109,6 +119,7 @@ python3 scripts/test_media_extract.py
     首句与明细不得含规则编号（`RULE-`/`CHK-`/`kb_id`）、知识库相对路径或 `issueId` 形态的内部代号；明细须给出本次材料的可核对落点。
     首句另不得含公式串（`=SUM(...)`）、区域坐标（`AD6:AD10`）、`文件!表` 定位串或案例目录内相对路径（`工作版/…`、`提取/…`）——
     这类坐标移到明细行。不合格即校验失败、拒绝渲染，堵住“员工读不懂的长描述”。
+13. `externalDataVerification.applicability` 必填；`not_applicable` 时来源、检查项必须为空且禁止不可用声明，只有 `required` 才允许记录数据源不可用与未检查。
 
 ## renderer 行为（§10）
 
@@ -116,10 +127,10 @@ python3 scripts/test_media_extract.py
 - **确定性**：同一输入 + 同一 renderer 版本 → 逐字节一致输出（`render` 可重复比对）；
 - **自包含**：CSS 内嵌，无外链字体/样式/脚本/图片，无遥测；动态内容全部 HTML 转义；
 - **独立模板**：页面结构和 CSS 只维护在 `template/audit-report.html`；桌面端左侧目录可直达全部区域，窄屏转为顶部目录，打印时隐藏；
-- **完整结构**：中瑞世联AI审核报告 - [报告流水号ID] → AI 检出的问题项 → AI 外部数据核验结果 → 人工复核对照 → AI 审核表现评分卡
-  → 需要人工确认事项 → 本次审核依据 → 审核范围与未检查项 → 专业审核轨迹（默认折叠）→ 文件追溯信息；
+- **完整结构**：中瑞世联AI审核报告 - [报告流水号ID] → AI 检出的问题项 → 需要人工确认事项 → AI 外部数据核验结果 → 人工复核对照 → AI 审核表现评分卡
+  → 本次审核依据 → 审核范围与未检查项 → 专业审核轨迹（默认折叠）→ 文件追溯信息；
 - **问题卡片**：位置和问题直接可读；**问题描述按 §4.6 分行呈现——首句为加粗单行结论，明细逐行列点**，不拼成一整段；阶段二已执行时单列 AI 独立检出总数及高/中/低分布，`category=B` 卡片在标题区显示“AI 独立发现”；修改意见收进“展开修改意见（共 N 项）”，规则、材料、差异与结论收进另一带计数的明确展开控件；打印时两类折叠内容完整展开，严重程度**文字标签 + 颜色**并存；
-- **复核对照**：按文件声明顺序列出复核层级，逐级显示已验证修改、精确/部分/未命中及命中率；`L-unclosed` 高亮呈现答复与实际未落实证据；
+- **复核对照**：按文件声明顺序列出复核层级，逐级显示已验证修改、精确/部分/未命中及命中率；`L-unclosed` 在首屏、复核区标题下、复核级次与条目四处联动提示，并高亮呈现答复与实际未落实证据；
 - **客观评分卡**：命中率=`(exact+partial)/evaluable`（**部分命中计为命中，只是层次较低**），精确/部分/未命中作为命中层次单列；`L-resolved` 与 `L-uncheckable` 不进分母，综合率按明细加权重算；
 - **A4 打印**：`@page { size: A4; margin: 16mm 15mm 18mm; }`、卡片 `break-inside: avoid`、表头跨页重复，
   黑白可读；`renderPolicy.printTrail=true` 时轨迹默认展开；
