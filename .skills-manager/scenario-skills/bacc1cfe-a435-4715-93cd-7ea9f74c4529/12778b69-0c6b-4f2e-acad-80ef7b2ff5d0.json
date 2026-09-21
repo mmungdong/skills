@@ -5,7 +5,8 @@
   "sort_order": 0,
   "tools": {
     "codebuddy": true,
-    "deepseek_harness": true,
+    "deepseek_harness": false,
+    "hermes": true,
     "opencode": true,
     "workbuddy": true
   }
