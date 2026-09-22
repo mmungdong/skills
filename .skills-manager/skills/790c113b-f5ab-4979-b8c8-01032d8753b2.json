@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "790c113b-f5ab-4979-b8c8-01032d8753b2",
+  "path": "value-prop-statements",
+  "path_key": "value-prop-statements",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-marketing-growth/skills/value-prop-statements",
+    "branch": null
+  }
+}

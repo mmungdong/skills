@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "fd4b55dc-723e-4398-a60c-906e47bd73eb",
+  "path": "strategy-red-team",
+  "path_key": "strategy-red-team",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-execution/skills/strategy-red-team",
+    "branch": null
+  }
+}

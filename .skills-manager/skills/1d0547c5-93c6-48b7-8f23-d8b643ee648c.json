@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "1d0547c5-93c6-48b7-8f23-d8b643ee648c",
+  "path": "summarize-interview",
+  "path_key": "summarize-interview",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-discovery/skills/summarize-interview",
+    "branch": null
+  }
+}

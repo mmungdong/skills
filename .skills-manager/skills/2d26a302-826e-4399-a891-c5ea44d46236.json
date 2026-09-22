@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "2d26a302-826e-4399-a891-c5ea44d46236",
+  "path": "growth-loops",
+  "path_key": "growth-loops",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-go-to-market/skills/growth-loops",
+    "branch": null
+  }
+}

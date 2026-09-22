@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "61ac0383-7594-4b81-9224-78c3294db05e",
+  "path": "grammar-check",
+  "path_key": "grammar-check",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-toolkit/skills/grammar-check",
+    "branch": null
+  }
+}

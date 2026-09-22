@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "20c519da-c3f5-4ee8-a478-14938f63bcd8",
+  "path": "brainstorm-experiments-existing",
+  "path_key": "brainstorm-experiments-existing",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-discovery/skills/brainstorm-experiments-existing",
+    "branch": null
+  }
+}

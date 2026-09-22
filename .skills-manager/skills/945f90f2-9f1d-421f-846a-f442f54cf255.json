@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "945f90f2-9f1d-421f-846a-f442f54cf255",
+  "path": "beachhead-segment",
+  "path_key": "beachhead-segment",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-go-to-market/skills/beachhead-segment",
+    "branch": null
+  }
+}

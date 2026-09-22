@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "71d4dff2-5b12-4771-98ba-e792a77e9f6f",
+  "path": "product-name",
+  "path_key": "product-name",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-marketing-growth/skills/product-name",
+    "branch": null
+  }
+}

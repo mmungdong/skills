@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "5169400b-7a5f-407e-9607-011aec8c1c2f",
+  "path": "market-sizing",
+  "path_key": "market-sizing",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-market-research/skills/market-sizing",
+    "branch": null
+  }
+}

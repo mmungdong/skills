@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "0432f4b3-8989-4f50-b909-b438c950ff0a",
+  "path": "intended-vs-implemented",
+  "path_key": "intended-vs-implemented",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-ai-shipping/skills/intended-vs-implemented",
+    "branch": null
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "c7df2557-f1c5-4df3-bc8b-f56933798e85",
+  "path": "startup-canvas",
+  "path_key": "startup-canvas",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-strategy/skills/startup-canvas",
+    "branch": null
+  }
+}

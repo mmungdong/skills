@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "976e8983-3631-4416-8222-ec4948739497",
+  "path": "test-scenarios",
+  "path_key": "test-scenarios",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-execution/skills/test-scenarios",
+    "branch": null
+  }
+}

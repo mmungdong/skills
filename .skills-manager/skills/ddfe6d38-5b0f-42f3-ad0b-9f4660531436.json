@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "ddfe6d38-5b0f-42f3-ad0b-9f4660531436",
+  "path": "prioritization-frameworks",
+  "path_key": "prioritization-frameworks",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-execution/skills/prioritization-frameworks",
+    "branch": null
+  }
+}

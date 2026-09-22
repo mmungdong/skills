@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "fc5f5b12-4fe3-4af9-a7eb-f7e4cf4d8f72",
+  "path": "pricing-strategy",
+  "path_key": "pricing-strategy",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-strategy/skills/pricing-strategy",
+    "branch": null
+  }
+}

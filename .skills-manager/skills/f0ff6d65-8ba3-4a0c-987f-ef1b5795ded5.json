@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "f0ff6d65-8ba3-4a0c-987f-ef1b5795ded5",
+  "path": "analyze-feature-requests",
+  "path_key": "analyze-feature-requests",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-discovery/skills/analyze-feature-requests",
+    "branch": null
+  }
+}

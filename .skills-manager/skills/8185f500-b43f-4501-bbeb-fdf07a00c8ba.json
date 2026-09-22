@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "8185f500-b43f-4501-bbeb-fdf07a00c8ba",
+  "path": "interview-script",
+  "path_key": "interview-script",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-discovery/skills/interview-script",
+    "branch": null
+  }
+}

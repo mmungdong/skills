@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "ad453628-3a1c-4e41-94e4-cfe35aaa38f1",
+  "path": "positioning-ideas",
+  "path_key": "positioning-ideas",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-marketing-growth/skills/positioning-ideas",
+    "branch": null
+  }
+}

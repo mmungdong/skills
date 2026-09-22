@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "f0bfe9c4-b734-4d9c-aa2c-d570a43ae176",
+  "path": "opportunity-solution-tree",
+  "path_key": "opportunity-solution-tree",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-discovery/skills/opportunity-solution-tree",
+    "branch": null
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "755bc6de-27b4-4ad5-bf68-84f7d27ff17b",
+  "path": "prioritize-features",
+  "path_key": "prioritize-features",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-discovery/skills/prioritize-features",
+    "branch": null
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "ec78d02d-1718-4ab2-9d0b-50d685fa082c",
+  "path": "ideal-customer-profile",
+  "path_key": "ideal-customer-profile",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-go-to-market/skills/ideal-customer-profile",
+    "branch": null
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "8a71b079-49cc-4582-a505-80f826b9ef47",
+  "path": "swot-analysis",
+  "path_key": "swot-analysis",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-strategy/skills/swot-analysis",
+    "branch": null
+  }
+}

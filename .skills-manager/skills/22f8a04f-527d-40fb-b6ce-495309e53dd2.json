@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "22f8a04f-527d-40fb-b6ce-495309e53dd2",
+  "path": "ansoff-matrix",
+  "path_key": "ansoff-matrix",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-strategy/skills/ansoff-matrix",
+    "branch": null
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "6a72c8d3-db76-4b27-b24e-6559e24878a5",
+  "path": "sql-queries",
+  "path_key": "sql-queries",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-data-analytics/skills/sql-queries",
+    "branch": null
+  }
+}

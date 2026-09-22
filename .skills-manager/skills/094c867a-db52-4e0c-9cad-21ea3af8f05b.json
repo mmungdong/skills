@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "094c867a-db52-4e0c-9cad-21ea3af8f05b",
+  "path": "identify-assumptions-existing",
+  "path_key": "identify-assumptions-existing",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-discovery/skills/identify-assumptions-existing",
+    "branch": null
+  }
+}

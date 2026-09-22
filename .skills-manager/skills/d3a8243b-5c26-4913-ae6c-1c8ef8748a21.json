@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "d3a8243b-5c26-4913-ae6c-1c8ef8748a21",
+  "path": "product-strategy",
+  "path_key": "product-strategy",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-strategy/skills/product-strategy",
+    "branch": null
+  }
+}

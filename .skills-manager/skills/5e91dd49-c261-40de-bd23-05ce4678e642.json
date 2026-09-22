@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "5e91dd49-c261-40de-bd23-05ce4678e642",
+  "path": "pestle-analysis",
+  "path_key": "pestle-analysis",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-strategy/skills/pestle-analysis",
+    "branch": null
+  }
+}

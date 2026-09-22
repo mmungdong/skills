@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "d1f23254-bf61-46bc-88c3-e07072e8c23c",
+  "path": "north-star-metric",
+  "path_key": "north-star-metric",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-marketing-growth/skills/north-star-metric",
+    "branch": null
+  }
+}

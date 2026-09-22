@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "014ae36f-35f5-44d8-917c-5aa3f2d9c42f",
+  "path": "wwas",
+  "path_key": "wwas",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-execution/skills/wwas",
+    "branch": null
+  }
+}

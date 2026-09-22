@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "335b5e7d-b161-411b-a0d8-f06ad7752621",
+  "path": "product-vision",
+  "path_key": "product-vision",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-strategy/skills/product-vision",
+    "branch": null
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "13498259-815e-4610-8251-fc05c6b74bba",
+  "path": "prioritize-assumptions",
+  "path_key": "prioritize-assumptions",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-product-discovery/skills/prioritize-assumptions",
+    "branch": null
+  }
+}

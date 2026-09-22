@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "5cb9f94f-9baf-4ba2-bcfb-b40fcba91a49",
+  "path": "draft-nda",
+  "path_key": "draft-nda",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-toolkit/skills/draft-nda",
+    "branch": null
+  }
+}

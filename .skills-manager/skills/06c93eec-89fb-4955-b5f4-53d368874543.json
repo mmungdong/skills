@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "06c93eec-89fb-4955-b5f4-53d368874543",
+  "path": "gtm-strategy",
+  "path_key": "gtm-strategy",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-go-to-market/skills/gtm-strategy",
+    "branch": null
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "b1935e8a-c861-4d9b-a4d3-677c2f2a7ebb",
+  "path": "stakeholder-map",
+  "path_key": "stakeholder-map",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-execution/skills/stakeholder-map",
+    "branch": null
+  }
+}

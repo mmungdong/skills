@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "1d500e6a-f51c-4583-be75-e490a94a0e83",
+  "path": "create-prd",
+  "path_key": "create-prd",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-execution/skills/create-prd",
+    "branch": null
+  }
+}

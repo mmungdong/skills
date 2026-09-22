@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "5497548f-9189-4999-a6c4-5589649a20f5",
+  "path": "review-resume",
+  "path_key": "review-resume",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-toolkit/skills/review-resume",
+    "branch": null
+  }
+}

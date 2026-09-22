@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "a20d2946-5a4b-4410-8600-0390f5b20ac4",
+  "path": "privacy-policy",
+  "path_key": "privacy-policy",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-toolkit/skills/privacy-policy",
+    "branch": null
+  }
+}

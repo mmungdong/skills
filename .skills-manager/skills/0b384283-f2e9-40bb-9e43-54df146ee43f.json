@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "0b384283-f2e9-40bb-9e43-54df146ee43f",
+  "path": "user-personas",
+  "path_key": "user-personas",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-market-research/skills/user-personas",
+    "branch": null
+  }
+}

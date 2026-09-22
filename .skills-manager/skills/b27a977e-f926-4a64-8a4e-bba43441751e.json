@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "b27a977e-f926-4a64-8a4e-bba43441751e",
+  "path": "customer-journey-map",
+  "path_key": "customer-journey-map",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-market-research/skills/customer-journey-map",
+    "branch": null
+  }
+}

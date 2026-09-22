@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "401f7c0e-29c3-4a75-a61c-2daff86e8cfc",
+  "path": "gtm-motions",
+  "path_key": "gtm-motions",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-go-to-market/skills/gtm-motions",
+    "branch": null
+  }
+}

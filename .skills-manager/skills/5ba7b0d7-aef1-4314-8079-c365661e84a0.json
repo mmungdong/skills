@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "5ba7b0d7-aef1-4314-8079-c365661e84a0",
+  "path": "code-review",
+  "path_key": "code-review",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-ai-shipping/skills/code-review",
+    "branch": null
+  }
+}

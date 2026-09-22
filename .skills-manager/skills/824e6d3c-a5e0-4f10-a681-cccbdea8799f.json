@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "824e6d3c-a5e0-4f10-a681-cccbdea8799f",
+  "path": "marketing-ideas",
+  "path_key": "marketing-ideas",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-marketing-growth/skills/marketing-ideas",
+    "branch": null
+  }
+}

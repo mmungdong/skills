@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "9d291626-4b8d-47a1-a0cf-7776edd6a11c",
+  "path": "cohort-analysis",
+  "path_key": "cohort-analysis",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-data-analytics/skills/cohort-analysis",
+    "branch": null
+  }
+}

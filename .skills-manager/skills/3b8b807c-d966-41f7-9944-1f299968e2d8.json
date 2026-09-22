@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "3b8b807c-d966-41f7-9944-1f299968e2d8",
+  "path": "release-notes",
+  "path_key": "release-notes",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-execution/skills/release-notes",
+    "branch": null
+  }
+}

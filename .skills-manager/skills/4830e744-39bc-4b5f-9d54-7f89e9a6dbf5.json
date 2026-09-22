@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "4830e744-39bc-4b5f-9d54-7f89e9a6dbf5",
+  "path": "market-segments",
+  "path_key": "market-segments",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-market-research/skills/market-segments",
+    "branch": null
+  }
+}

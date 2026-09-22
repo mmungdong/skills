@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "skill_id": "4095e646-212c-4b3a-bd63-b56ca7e224cd",
+  "path": "competitor-analysis",
+  "path_key": "competitor-analysis",
+  "enabled": true,
+  "tags": [],
+  "source": {
+    "type": "git",
+    "ref": "https://github.com/phuryn/pm-skills",
+    "subpath": "pm-market-research/skills/competitor-analysis",
+    "branch": null
+  }
+}
