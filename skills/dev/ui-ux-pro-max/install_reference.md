@@ -2,7 +2,7 @@
 
 - **来源**: https://www.npmjs.com/package/claude-code-templates
 - **类型**: npm
-- **版本**: 1.29.2
+- **版本**: 1.29.6
 
 ## 安装
 
@@ -21,7 +21,7 @@ npx claude-code-templates@latest --skill creative-design/ui-ux-pro-max
 git clone https://github.com/davila7/claude-code-templates.git vendor/claude-code-templates
 
 # 软链接 skill 到 Claude Code
-ln -s vendor/claude-code-templates/cli-tool/components/skills/creative-design/ui-ux-pro-max ~/.claude/skills/ui-ux-pro-max
+ln -s "$(pwd)/vendor/claude-code-templates/cli-tool/components/skills/creative-design/ui-ux-pro-max" ~/.claude/skills/ui-ux-pro-max
 ```
 
 ## 说明

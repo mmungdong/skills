@@ -2,11 +2,11 @@
 
 # 🐾 Skills
 
-**A curated collection of Claude Code Skills — built, referenced, and maintained.**
+**A curated, cross-agent collection of reusable skills — built, referenced, and maintained.**
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Claude%20Code-7c3aed.svg)](https://claude.com/claude-code)
-[![Skills](https://img.shields.io/badge/Skills-9%2B-16a34a.svg)](#-collected-skills)
+[![Platform](https://img.shields.io/badge/Platform-Claude%20Code%20%7C%20Codex%20%7C%20DSH%20%7C%20OpenCode-7c3aed.svg)](#-installation)
+[![Skills](https://img.shields.io/badge/Skills-12%2B-16a34a.svg)](#-collected-skills)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-ff69b4.svg)](https://github.com/mmungdong/skills/pulls)
 
 [English](./README.md) · [中文](./README_zh.md)
@@ -17,7 +17,7 @@
 
 ## ✨ Overview
 
-This repository gathers the Claude Code Skills I use day-to-day — some authored here, some referenced from the community. Each skill is self-contained and can be symlinked into any agent's skills directory.
+This repository gathers the agent skills I use day-to-day across Claude Code, Codex, DeepSeek Harness, and OpenCode — some authored here, some referenced from the community. Each skill is self-contained and can be symlinked into a supported agent's skills directory.
 
 - 🧩 **Two skill types** — custom (authored, with `SKILL.md` + `skill.json`) and referenced (external, with `install_reference.md`)
 - 🔗 **Symlink-friendly** — install once, update everywhere
@@ -43,9 +43,8 @@ This repository gathers the Claude Code Skills I use day-to-day — some authore
 skills/
 ├── README.md                # You are here
 ├── Agents.md                # Agent conventions
-├── CLAUDE.md                # Claude Code project config
 ├── agent-config/            # Global agent conventions (symlinkable)
-├── .claude/skills/          # Project-level skills (not distributable)
+├── .agents/skills/          # Repository-maintenance skills
 │   └── <skill-name>/
 │       └── SKILL.md
 ├── github/                  # GitHub sources (not yet integrated)
@@ -129,8 +128,12 @@ Install command...
 ## 📦 Installation
 
 ```bash
-# Custom skill: symlink into the Claude Code skills directory
+# Custom skill: choose an agent's global skills directory
+mkdir -p ~/.claude/skills ~/.codex/skills ~/.dsh/skills ~/.opencode/skills
 ln -s "$(pwd)/skills/dev/my-skill" ~/.claude/skills/my-skill
+ln -s "$(pwd)/skills/dev/my-skill" ~/.codex/skills/my-skill
+ln -s "$(pwd)/skills/dev/my-skill" ~/.dsh/skills/my-skill
+ln -s "$(pwd)/skills/dev/my-skill" ~/.opencode/skills/my-skill
 
 # Referenced skill: follow the instructions in its install_reference.md
 ```
@@ -141,13 +144,13 @@ ln -s "$(pwd)/skills/dev/my-skill" ~/.claude/skills/my-skill
 
 ## 🛠 Project Skills
 
-Skills in `.claude/skills/` are project-level tools for managing this repository itself. They are **not distributable**.
+Skills in `.agents/skills/` are repository-level tools for maintaining and installing this collection. Codex and DeepSeek Harness both discover this shared project directory directly.
 
 | Skill | Description | Version |
 |-------|-------------|---------|
-| [skill-sync](.claude/skills/skill-sync/SKILL.md) | Check if external skill references are up-to-date, fetch updates from GitHub, and sync local records | 1.0.0 |
-| [skill-installer](.claude/skills/skill-installer/SKILL.md) | Check installation status and interactively install skills to Agent skills directories | 1.0.0 |
-| [agent-config](.claude/skills/agent-config/SKILL.md) | Install personal global conventions to each agent's global config via symlinks; supports install, status, uninstall, reinstall | 1.0.0 |
+| [skill-sync](.agents/skills/skill-sync/SKILL.md) | Check if external skill references are up-to-date, fetch updates from GitHub, and sync local records | 1.2.0 |
+| [skill-installer](.agents/skills/skill-installer/SKILL.md) | Check installation status and interactively install skills to Agent skills directories | 1.2.0 |
+| [agent-config](.agents/skills/agent-config/SKILL.md) | Install personal global conventions to each agent's global config via symlinks; supports install, status, uninstall, reinstall | 1.1.0 |
 
 ---
 
@@ -157,15 +160,18 @@ Skills in `.claude/skills/` are project-level tools for managing this repository
 
 | Skill | Description | Version |
 |-------|-------------|---------|
-| [superpowers](skills/dev/superpowers/install_reference.md) | Practical Claude Code superpowers for enhanced development workflows | 6.1.1 |
-| [code-reviewer](skills/dev/code-reviewer/install_reference.md) | Comprehensive code review skill for TypeScript, JavaScript, Python, Swift, Kotlin, Go — automated analysis, best-practice checking, security scanning, and review checklists | 1.29.2 |
-| [ui-ux-pro-max](skills/dev/ui-ux-pro-max/install_reference.md) | UI/UX design intelligence — 50 styles, 21 palettes, 50 font pairings, 20 charts, 9 stacks (React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter, Tailwind, shadcn/ui) | 1.29.2 |
-| [grill-with-docs](skills/dev/grill-with-docs/install_reference.md) | A relentless interview to sharpen a plan or design, also creating docs (ADRs and glossary) as you go | 1.0.1 |
-| [ask-matt](skills/dev/ask-matt/install_reference.md) | Ask which skill or flow fits your situation. A router over the skills in this repo | 1.0.1 |
-| [grill-me](skills/dev/grill-me/install_reference.md) | A relentless interview to sharpen a plan or design — lightweight, conversation-only | 1.0.1 |
-| [grilling](skills/dev/grilling/install_reference.md) | Grill the user relentlessly about a plan, decision, or idea; triggers on 'grill' phrases | 1.0.1 |
-| [domain-modeling](skills/dev/domain-modeling/install_reference.md) | Build and sharpen a project's domain model — ubiquitous language, CONTEXT.md, ADRs | 1.0.1 |
-| [diagnosing-bugs](skills/dev/diagnosing-bugs/install_reference.md) | Diagnosis loop for hard bugs and performance regressions — root cause before fixes | 1.0.1 |
+| [superpowers](skills/dev/superpowers/install_reference.md) | A disciplined software-development workflow built from composable agent skills | 6.4.2 |
+| [code-reviewer](skills/dev/code-reviewer/install_reference.md) | Comprehensive code review skill for TypeScript, JavaScript, Python, Swift, Kotlin, Go — automated analysis, best-practice checking, security scanning, and review checklists | 1.29.6 |
+| [ui-ux-pro-max](skills/dev/ui-ux-pro-max/install_reference.md) | UI/UX design intelligence — 50 styles, 21 palettes, 50 font pairings, 20 charts, 9 stacks (React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter, Tailwind, shadcn/ui) | 1.29.6 |
+| [grill-with-docs](skills/dev/grill-with-docs/install_reference.md) | A relentless interview to sharpen a plan or design, also creating docs (ADRs and glossary) as you go | 1.2.3 |
+| [ask-matt](skills/dev/ask-matt/install_reference.md) | Ask which skill or flow fits your situation. A router over the skills in this repo | 1.2.3 |
+| [handoff](skills/dev/handoff/install_reference.md) | Compact the current conversation into a handoff document for another agent to pick up | 1.2.3 |
+| [wait-what](skills/dev/wait-what/install_reference.md) | Re-pitch the previous response when it did not land with the user | 1.2.3 |
+| [writing-for-agents](skills/dev/writing-for-agents/install_reference.md) | Write documents for agents, including skills and AGENTS.md or CLAUDE.md instructions | 1.2.3 |
+| [grill-me](skills/dev/grill-me/install_reference.md) | A relentless interview to sharpen a plan or design — lightweight, conversation-only | 1.2.3 |
+| [grilling](skills/dev/grilling/install_reference.md) | Grill the user relentlessly about a plan, decision, or idea; triggers on 'grill' phrases | 1.2.3 |
+| [domain-modeling](skills/dev/domain-modeling/install_reference.md) | Build and sharpen a project's domain model — ubiquitous language, GLOSSARY.md, ADRs | 1.2.3 |
+| [diagnosing-bugs](skills/dev/diagnosing-bugs/install_reference.md) | Diagnosis loop for hard bugs and performance regressions — root cause before fixes | 1.2.3 |
 
 ---
 

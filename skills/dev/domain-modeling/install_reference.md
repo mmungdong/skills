@@ -2,7 +2,7 @@
 
 - **来源**: https://github.com/mattpocock/skills
 - **类型**: git
-- **版本**: 1.0.1
+- **版本**: 1.2.3
 - **路径**: skills/engineering/domain-modeling
 
 ## 安装
@@ -14,14 +14,14 @@ mattpocock/skills 是集合仓库，需克隆到本仓库 `vendor/` 目录后软
 git clone https://github.com/mattpocock/skills.git vendor/mattpocock-skills
 
 # 软链接单个 skill 到 Claude Code
-ln -s vendor/mattpocock-skills/skills/engineering/domain-modeling ~/.claude/skills/domain-modeling
+ln -s "$(pwd)/vendor/mattpocock-skills/skills/engineering/domain-modeling" ~/.claude/skills/domain-modeling
 ```
 
 ## 说明
 
-Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a CONTEXT.md, or recording or editing an ADR.
+Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a GLOSSARY.md, or recording or editing an ADR.
 
-适用于项目进入实现期：统一团队术语（ubiquitous language），编写或维护 CONTEXT.md，记录架构决策（ADR），让领域知识从对话沉淀为可维护的模型文档。
+适用于项目进入实现期：统一团队术语（ubiquitous language），编写或维护 GLOSSARY.md，记录架构决策（ADR），让领域知识从对话沉淀为可维护的模型文档。
 
 ## 选型定位
 

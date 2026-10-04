@@ -1,8 +1,8 @@
 ---
 name: agent-config
-description: 根据 agent-config/README.md 把个人全局规范软链安装到各 agent 工具（Claude Code、Codex、OpenCode）的全局配置文件。支持安装、状态检查、卸载、备份现有配置。适用于初始化 agent 全局规范、检查软链状态、同步规范更新到全局。
+description: 根据 agent-config/README.md 把个人全局规范软链安装到各 agent 工具（Claude Code、Codex、DeepSeek Harness、OpenCode）的全局配置文件。支持安装、状态检查、卸载、备份现有配置。适用于初始化 agent 全局规范、检查软链状态、同步规范更新到全局。
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # Agent Config
@@ -23,11 +23,13 @@ metadata:
 |-----------|------------|------|
 | Claude Code | `~/.claude/CLAUDE.md` | |
 | Codex (OpenAI) | `~/.codex/AGENTS.md` | 若 `~/.codex/AGENTS.override.md` 存在则其优先；可用 `CODEX_HOME` 改变家目录 |
+| DeepSeek Harness | `~/.dsh/AGENTS.md` | 可用 `DSH_HOME` 改变 Harness 主目录 |
 | OpenCode | `~/.config/opencode/AGENTS.md` | OpenCode 会 fallback 到 `~/.claude/CLAUDE.md` |
 
-源文件（绝对路径，按实际仓库位置调整）：
+在仓库根目录运行时解析源文件：
 ```
-/home/mungdong/workspace/skills/agent-config/README.md
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SOURCE="$REPO_ROOT/agent-config/README.md"
 ```
 
 ## Process
@@ -41,20 +43,43 @@ metadata:
 3. **卸载**（uninstall）—— 移除软链
 4. **重新安装**（reinstall）—— 卸载后重新安装
 
-再确认**目标 agent**：Claude Code / Codex / OpenCode，或全部。
+再确认**目标 agent**：Claude Code / Codex / DeepSeek Harness / OpenCode，或全部。
 
 ### Phase 2: 状态检查
 
 对每个目标 agent，检查目标路径当前状态：
 
 ```bash
-# 解析 CODEX_HOME（影响 Codex 路径）
-echo "CODEX_HOME=${CODEX_HOME:-<未设置，使用 ~/.codex>}"
+# 解析可配置的 Agent 主目录
+CODEX_ROOT="${CODEX_HOME:-$HOME/.codex}"
+DSH_ROOT="${DSH_HOME:-$HOME/.dsh}"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SOURCE="$REPO_ROOT/agent-config/README.md"
+echo "CODEX_ROOT=$CODEX_ROOT"
+echo "DSH_ROOT=$DSH_ROOT"
 
-# 检查目标路径
-ls -lL ~/.claude/CLAUDE.md 2>/dev/null
-ls -lL ~/.codex/AGENTS.md 2>/dev/null
-ls -lL ~/.config/opencode/AGENTS.md 2>/dev/null
+# 检查目标路径；不要使用 ls -L，因为它无法区分软链和普通文件
+check_target() {
+  TARGET="$1"
+  if [ -L "$TARGET" ]; then
+    if [ ! -e "$TARGET" ]; then
+      echo "⚠️ 损坏软链: $TARGET -> $(readlink "$TARGET")"
+    elif [ "$(realpath "$TARGET")" = "$SOURCE" ]; then
+      echo "✅ 已安装（本仓库）: $TARGET"
+    else
+      echo "⚠️ 已安装（其他来源）: $TARGET -> $(readlink "$TARGET")"
+    fi
+  elif [ -e "$TARGET" ]; then
+    echo "⚠️ 普通文件（需备份）: $TARGET"
+  else
+    echo "❌ 未安装: $TARGET"
+  fi
+}
+
+check_target ~/.claude/CLAUDE.md
+check_target "$CODEX_ROOT/AGENTS.md"
+check_target "$DSH_ROOT/AGENTS.md"
+check_target ~/.config/opencode/AGENTS.md
 ```
 
 判断状态（优先级）：
@@ -70,6 +95,7 @@ ls -lL ~/.config/opencode/AGENTS.md 2>/dev/null
 |-------|---------|------|
 | Claude Code | ~/.claude/CLAUDE.md | ✅ 已安装(本仓库) |
 | Codex | ~/.codex/AGENTS.md | ⚠️ 普通文件 |
+| DeepSeek Harness | ~/.dsh/AGENTS.md | ✅ 已安装(本仓库) |
 | OpenCode | ~/.config/opencode/AGENTS.md | ❌ 未安装 |
 ```
 
@@ -81,13 +107,21 @@ ls -lL ~/.config/opencode/AGENTS.md 2>/dev/null
 
 #### 1. 处理已存在的目标文件
 
-若目标路径已存在（普通文件或指向其他的软链），**先备份**：
+若目标路径已存在（包括普通文件、其他来源软链或损坏软链），**先备份**：
 
 ```bash
-# 备份命名带时间戳，避免覆盖已有备份
-BACKUP="<target>.bak.$(date +%Y%m%d%H%M%S)"
-mv "<target>" "$BACKUP"
-echo "已备份: $BACKUP"
+TARGET="<target>"
+if [ -e "$TARGET" ] || [ -L "$TARGET" ]; then
+  BASE_BACKUP="$TARGET.bak.$(date +%Y%m%d%H%M%S)"
+  BACKUP="$BASE_BACKUP"
+  INDEX=0
+  while [ -e "$BACKUP" ] || [ -L "$BACKUP" ]; do
+    INDEX=$((INDEX + 1))
+    BACKUP="$BASE_BACKUP.$INDEX"
+  done
+  mv "$TARGET" "$BACKUP"
+  echo "已备份: $BACKUP"
+fi
 ```
 
 若已是本仓库软链，跳过（无需重装）；若主人坚持重装，先删旧软链再建。
@@ -95,17 +129,23 @@ echo "已备份: $BACKUP"
 #### 2. 创建软链
 
 ```bash
-SOURCE="/home/mungdong/workspace/skills/agent-config/README.md"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SOURCE="$REPO_ROOT/agent-config/README.md"
+CODEX_ROOT="${CODEX_HOME:-$HOME/.codex}"
+DSH_ROOT="${DSH_HOME:-$HOME/.dsh}"
 # 必须用绝对路径，否则工作目录变化时软链失效
 
 mkdir -p ~/.claude
-ln -sf "$SOURCE" ~/.claude/CLAUDE.md
+ln -s "$SOURCE" ~/.claude/CLAUDE.md
 
-mkdir -p ~/.codex
-ln -sf "$SOURCE" ~/.codex/AGENTS.md
+mkdir -p "$CODEX_ROOT"
+ln -s "$SOURCE" "$CODEX_ROOT/AGENTS.md"
+
+mkdir -p "$DSH_ROOT"
+ln -s "$SOURCE" "$DSH_ROOT/AGENTS.md"
 
 mkdir -p ~/.config/opencode
-ln -sf "$SOURCE" ~/.config/opencode/AGENTS.md
+ln -s "$SOURCE" ~/.config/opencode/AGENTS.md
 ```
 
 （按主人选定的目标 agent 执行对应命令，不必全部执行。）
@@ -113,8 +153,8 @@ ln -sf "$SOURCE" ~/.config/opencode/AGENTS.md
 #### 3. 验证
 
 ```bash
-ls -l ~/.claude/CLAUDE.md
-head -3 ~/.claude/CLAUDE.md   # 确认内容可读、软链有效
+ls -l ~/.claude/CLAUDE.md "$CODEX_ROOT/AGENTS.md" "$DSH_ROOT/AGENTS.md" ~/.config/opencode/AGENTS.md
+head -3 "$DSH_ROOT/AGENTS.md"   # 确认内容可读、软链有效
 ```
 
 #### 4. 回报
@@ -147,3 +187,4 @@ fi
 - **规范编辑不在此 skill**——改规范直接编辑 `agent-config/README.md`，软链处自动同步，无需重新安装
 - **项目级优先**——全局规范是默认值，项目级 `CLAUDE.md`/`AGENTS.md` 约定优先；本 skill 不处理项目级配置
 - **Codex 路径受 `CODEX_HOME` 影响**——执行前用 `echo $CODEX_HOME` 确认实际家目录
+- **DeepSeek Harness 路径受 `DSH_HOME` 影响**——未设置时使用 `~/.dsh`，全局规范文件为 `$DSH_HOME/AGENTS.md`

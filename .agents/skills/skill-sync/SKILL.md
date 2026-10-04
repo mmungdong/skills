@@ -2,7 +2,7 @@
 name: skill-sync
 description: 检查本项目中外部 skill 引用是否为最新。扫描所有 install_reference.md 文件，从 GitHub 获取最新状态，与本地记录对比，并可选地更新本地记录。适用于检查 skill 更新、查看外部 skill 仓库的变化，或同步本地引用。
 metadata:
-  version: 1.0.0
+  version: 1.2.0
 ---
 
 # Skill Sync
@@ -22,12 +22,12 @@ Scan all referenced skill repositories in this project, check for updates on Git
 Find every `install_reference.md` in the project:
 
 ```bash
-find . -name "install_reference.md" -not -path "./.git/*"
+find ./github ./skills -name "install_reference.md" -type f
 ```
 
 This covers both:
 - `github/<user>/<repo>/install_reference.md` — external repos not yet integrated into workspace
-- `skills/skills/<category>/<skill>/install_reference.md` — referenced skills already under management
+- `skills/<category>/<skill>/install_reference.md` — referenced skills already under management
 
 ### 2. Parse Source Repo URL
 
@@ -77,6 +77,16 @@ For each remote skill, compare against local records:
 - **❌ Removed**: Skill exists in local but not in remote
 - **✅ Unchanged**: Skill exists in both and description matches
 
+### Description Localization
+
+Preserve the language already used by each local skill table. For a table whose descriptions are in Simplified Chinese, such as `github/mattpocock/skills/install_reference.md`:
+
+- Translate upstream descriptions into Simplified Chinese before comparison
+- Compare the translated description with the local Chinese description; do not flag a change solely because the upstream source is English
+- Keep the existing Chinese text when the upstream meaning has not changed
+- Write new or meaningfully changed descriptions in Simplified Chinese
+- Never replace a localized Chinese description with raw upstream English
+
 ### 5. Display Diff
 
 Show results grouped by source repo:
@@ -112,6 +122,8 @@ For selective update, let user pick which changes to apply.
 ### 7. Update install_reference.md
 
 Rewrite the `install_reference.md` file with updated skill list, **preserving the "已集成" column status** (❌/✅ values must not change for existing skills). New skills default to ❌.
+
+Preserve the table's existing description language. Translate new or changed upstream descriptions into that language before writing them.
 
 Maintain the original format:
 - Category headings (`### engineering`, etc.)

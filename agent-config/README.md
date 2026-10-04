@@ -14,9 +14,10 @@
 |-----------|------------|------|
 | **Claude Code** | `~/.claude/CLAUDE.md` | Windows 路径：`%USERPROFILE%\.claude\CLAUDE.md` |
 | **Codex (OpenAI)** | `~/.codex/AGENTS.md` | 若 `~/.codex/AGENTS.override.md` 存在则其优先；可用 `CODEX_HOME` 改变家目录，路径变为 `$CODEX_HOME/AGENTS.md` |
+| **DeepSeek Harness** | `~/.dsh/AGENTS.md` | 可用 `DSH_HOME` 改变 Harness 主目录，路径变为 `$DSH_HOME/AGENTS.md` |
 | **OpenCode** | `~/.config/opencode/AGENTS.md` | OpenCode 会 fallback 到 `~/.claude/CLAUDE.md`；若两者并存，`AGENTS.md` 优先 |
 
-**路径核实**：安装前用 `echo $CODEX_HOME`、`ls ~/.config/opencode/` 等确认实际路径。
+**路径核实**：安装前用 `echo $CODEX_HOME`、`echo $DSH_HOME`、`ls ~/.config/opencode/` 等确认实际路径。
 
 ---
 
@@ -24,39 +25,54 @@
 
 ### 2.1 安装命令
 
-本仓库源文件路径示例：`/home/mungdong/workspace/skills/agent-config/README.md`（按实际仓库位置调整）。
+在本仓库根目录执行以下命令：
 
 ```bash
-# 源文件（用绝对路径，避免工作目录变化导致链接失效）
-SOURCE="/home/mungdong/workspace/skills/agent-config/README.md"
+# 源文件（解析为绝对路径，避免工作目录变化导致链接失效）
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SOURCE="$REPO_ROOT/agent-config/README.md"
+CODEX_ROOT="${CODEX_HOME:-$HOME/.codex}"
+DSH_ROOT="${DSH_HOME:-$HOME/.dsh}"
 
 # Claude Code
 mkdir -p ~/.claude
-ln -sf "$SOURCE" ~/.claude/CLAUDE.md
+ln -s "$SOURCE" ~/.claude/CLAUDE.md
 
 # Codex (OpenAI)
-mkdir -p ~/.codex
-ln -sf "$SOURCE" ~/.codex/AGENTS.md
+mkdir -p "$CODEX_ROOT"
+ln -s "$SOURCE" "$CODEX_ROOT/AGENTS.md"
+
+# DeepSeek Harness
+mkdir -p "$DSH_ROOT"
+ln -s "$SOURCE" "$DSH_ROOT/AGENTS.md"
 
 # OpenCode
 mkdir -p ~/.config/opencode
-ln -sf "$SOURCE" ~/.config/opencode/AGENTS.md
+ln -s "$SOURCE" ~/.config/opencode/AGENTS.md
 ```
 
 ### 2.2 验证安装
 
 ```bash
 # 确认软链指向正确
-ls -l ~/.claude/CLAUDE.md ~/.codex/AGENTS.md ~/.config/opencode/AGENTS.md
+ls -l ~/.claude/CLAUDE.md "$CODEX_ROOT/AGENTS.md" "$DSH_ROOT/AGENTS.md" ~/.config/opencode/AGENTS.md
 # 确认内容可读
-head -3 ~/.claude/CLAUDE.md
+head -3 "$DSH_ROOT/AGENTS.md"
 ```
 
 ### 2.3 注意事项
 
-- **目标文件已存在时**：`ln -sf` 的 `-f` 会强制覆盖。若目标文件已有其他内容，**先备份再软链**：
+- **目标文件已存在时**：若目标文件已有其他内容，**先备份再软链**：
   ```bash
-  mv ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak
+  TARGET=~/.claude/CLAUDE.md
+  BASE_BACKUP="$TARGET.bak.$(date +%Y%m%d%H%M%S)"
+  BACKUP="$BASE_BACKUP"
+  INDEX=0
+  while [ -e "$BACKUP" ] || [ -L "$BACKUP" ]; do
+    INDEX=$((INDEX + 1))
+    BACKUP="$BASE_BACKUP.$INDEX"
+  done
+  mv "$TARGET" "$BACKUP"
   ```
   若已有内容需要保留，先把其合并进本文件「3. 规范内容」后再软链。
 - **绝对路径**：软链必须用绝对路径，相对路径会在工作目录变化时失效。

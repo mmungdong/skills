@@ -2,7 +2,7 @@
 
 - **来源**: https://github.com/mattpocock/skills
 - **类型**: git
-- **版本**: 1.0.1
+- **版本**: 1.2.3
 - **路径**: skills/productivity/grilling
 
 ## 安装
@@ -14,7 +14,7 @@ mattpocock/skills 是集合仓库，需克隆到本仓库 `vendor/` 目录后软
 git clone https://github.com/mattpocock/skills.git vendor/mattpocock-skills
 
 # 软链接单个 skill 到 Claude Code
-ln -s vendor/mattpocock-skills/skills/productivity/grilling ~/.claude/skills/grilling
+ln -s "$(pwd)/vendor/mattpocock-skills/skills/productivity/grilling" ~/.claude/skills/grilling
 ```
 
 ## 说明
