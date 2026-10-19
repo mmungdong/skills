@@ -6,7 +6,7 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Claude%20Code%20%7C%20Codex%20%7C%20DSH%20%7C%20OpenCode-7c3aed.svg)](#-installation)
-[![Skills](https://img.shields.io/badge/Skills-12%2B-16a34a.svg)](#-collected-skills)
+[![Skills](https://img.shields.io/badge/Skills-14%2B-16a34a.svg)](#-collected-skills)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-ff69b4.svg)](https://github.com/mmungdong/skills/pulls)
 
 [English](./README.md) · [中文](./README_zh.md)
@@ -172,6 +172,10 @@ Skills in `.agents/skills/` are repository-level tools for maintaining and insta
 | [grilling](skills/dev/grilling/install_reference.md) | Grill the user relentlessly about a plan, decision, or idea; triggers on 'grill' phrases | 1.2.3 |
 | [domain-modeling](skills/dev/domain-modeling/install_reference.md) | Build and sharpen a project's domain model — ubiquitous language, GLOSSARY.md, ADRs | 1.2.3 |
 | [diagnosing-bugs](skills/dev/diagnosing-bugs/install_reference.md) | Diagnosis loop for hard bugs and performance regressions — root cause before fixes | 1.2.3 |
+| [yfb-write-plan](skills/dev/yfb-write-plan/SKILL.md) | Turn requests into executable plans and review execution reports with evidence | 1.0.0 |
+| [yfb-execute-plan](skills/dev/yfb-execute-plan/SKILL.md) | Execute structured plans, verify each criterion, and return evidence-based feedback | 1.0.0 |
+| [dsh-orchestrator](skills/dev/dsh-orchestrator/SKILL.md) | Use when a supervisor model should direct implementation through local DeepSeek Harness (DSH), especially when DSH needs detailed instructions and the supervisor must perform checks and acceptance itself. | 1.1.0 |
+| [project-map](skills/dev/project-map/SKILL.md) | Use when a project needs documentation of feature flows, directory responsibilities, per-file functions, or guidance on where to make future code changes. | 1.0.0 |
 
 ---
 

@@ -1,0 +1,25 @@
+{
+  "task_id": "greeting-implementation-1",
+  "checks": [
+    {
+      "id": "valid-names",
+      "argv": [
+        "python3",
+        "-B",
+        "-c",
+        "from greeting import greet; assert greet('Ada') == 'Hello, Ada!'; assert greet('  Ada  ') == 'Hello, Ada!'; assert greet('Ada  Lovelace') == 'Hello, Ada  Lovelace!'"
+      ],
+      "timeout": 30
+    },
+    {
+      "id": "invalid-names",
+      "argv": [
+        "python3",
+        "-B",
+        "-c",
+        "from greeting import greet\nfor value in ['', '   ', None, 42]:\n    try:\n        greet(value)\n    except ValueError:\n        continue\n    raise AssertionError('expected ValueError')"
+      ],
+      "timeout": 30
+    }
+  ]
+}

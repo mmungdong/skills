@@ -1,0 +1,4 @@
+interface:
+  display_name: "DSH Orchestrator"
+  short_description: "Direct one detailed DSH work package, batch your own checks, and verify results yourself"
+  default_prompt: "Use $dsh-orchestrator to send one detailed local DSH work package, run batched supervisor-owned checks with the check command, and record acceptance yourself."

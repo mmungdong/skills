@@ -6,7 +6,7 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Claude%20Code%20%7C%20Codex%20%7C%20DSH%20%7C%20OpenCode-7c3aed.svg)](#-安装使用)
-[![Skills](https://img.shields.io/badge/Skills-12%2B-16a34a.svg)](#-已收集的-skills)
+[![Skills](https://img.shields.io/badge/Skills-14%2B-16a34a.svg)](#-已收集的-skills)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-ff69b4.svg)](https://github.com/mmungdong/skills/pulls)
 
 [中文](./README_zh.md) · [English](./README.md)
@@ -172,6 +172,10 @@ ln -s "$(pwd)/skills/dev/my-skill" ~/.opencode/skills/my-skill
 | [grilling](skills/dev/grilling/install_reference.md) | 反复盘问用户以打磨计划、决策或想法；'grill' 等触发词驱动 | 1.2.3 |
 | [domain-modeling](skills/dev/domain-modeling/install_reference.md) | 构建并打磨项目领域模型——统一术语、维护 GLOSSARY.md、记录架构决策 | 1.2.3 |
 | [diagnosing-bugs](skills/dev/diagnosing-bugs/install_reference.md) | 疑难 bug 与性能回归的诊断循环——先定位根因再修复 | 1.2.3 |
+| [yfb-write-plan](skills/dev/yfb-write-plan/SKILL.md) | 将需求转为可执行方案，并基于证据评审执行报告 | 1.0.0 |
+| [yfb-execute-plan](skills/dev/yfb-execute-plan/SKILL.md) | 执行结构化方案、验证每项标准并返回带证据的反馈 | 1.0.0 |
+| [dsh-orchestrator](skills/dev/dsh-orchestrator/SKILL.md) | Use when a supervisor model should direct implementation through local DeepSeek Harness (DSH), especially when DSH needs detailed instructions and the supervisor must perform checks and acceptance itself. | 1.1.0 |
+| [project-map](skills/dev/project-map/SKILL.md) | 梳理项目功能流程、目录职责与逐文件函数用途，提供后续修改入口和影响范围 | 1.0.0 |
 
 ---
 

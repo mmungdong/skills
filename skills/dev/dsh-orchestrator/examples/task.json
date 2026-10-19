@@ -1,0 +1,29 @@
+{
+  "task_id": "greeting-implementation-1",
+  "objective": "Implement the specified greet(name) behavior in greeting.py",
+  "workdir": "/absolute/path/to/project",
+  "context": "The supervisor has read greeting.py. Its current implementation concatenates 'Hello, ' and name without validation. The supervisor owns all checking.",
+  "scope": ["greeting.py"],
+  "steps": [
+    {
+      "id": "S1",
+      "action": "Read greeting.py and applicable AGENTS.md. Preserve unrelated edits and the existing greet(name) signature. Implement isinstance(name, str) validation before calling string methods; reject non-string names with ValueError. Strip leading/trailing whitespace; reject an empty result with ValueError. Return exactly 'Hello, <trimmed name>!' while preserving internal spaces. Change only greet(name); add no dependencies or files.",
+      "paths": ["greeting.py"]
+    }
+  ],
+  "deliverables": ["greeting.py containing the specified greet(name) implementation; report the actual changed path and completed step ID"],
+  "acceptance": [
+    {
+      "id": "AC1",
+      "check": "Supervisor inspects the diff and confirms only the requested function changed"
+    },
+    {
+      "id": "AC2",
+      "check": "Supervisor imports greet and confirms 'Ada' and '  Ada  ' return 'Hello, Ada!'; 'Ada  Lovelace' preserves internal spaces; '', whitespace, None and 42 raise ValueError"
+    }
+  ],
+  "constraints": [
+    "Implementation only: supervisor performs tests, lint, build, review and acceptance; report checks as pending rather than running them",
+    "Preserve unrelated changes; no commit, push, publication, dependency installation or recursive delegation"
+  ]
+}

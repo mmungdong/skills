@@ -1,0 +1,4 @@
+interface:
+  display_name: "项目文档地图"
+  short_description: "梳理项目功能流程、目录职责和逐文件函数，定位后续修改入口与影响范围"
+  default_prompt: "请使用 $project-map 整理当前项目的整体文档，说明功能流程、目录职责、每个文件的函数用途，以及后续修改的位置。"
