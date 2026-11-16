@@ -163,6 +163,7 @@ Skills in `.agents/skills/` are repository-level tools for maintaining and insta
 | [superpowers](skills/dev/superpowers/install_reference.md) | A disciplined software-development workflow built from composable agent skills | 6.4.2 |
 | [code-reviewer](skills/dev/code-reviewer/install_reference.md) | Comprehensive code review skill for TypeScript, JavaScript, Python, Swift, Kotlin, Go — automated analysis, best-practice checking, security scanning, and review checklists | 1.29.6 |
 | [ui-ux-pro-max](skills/dev/ui-ux-pro-max/install_reference.md) | UI/UX design intelligence — 50 styles, 21 palettes, 50 font pairings, 20 charts, 9 stacks (React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter, Tailwind, shadcn/ui) | 1.29.6 |
+| [security-audit](skills/dev/security-audit/install_reference.md) | Multi-phase security audit — threat modeling, attack-surface enumeration, independently verified machine-readable findings | c1c8a8c |
 | [grill-with-docs](skills/dev/grill-with-docs/install_reference.md) | A relentless interview to sharpen a plan or design, also creating docs (ADRs and glossary) as you go | 1.2.3 |
 | [ask-matt](skills/dev/ask-matt/install_reference.md) | Ask which skill or flow fits your situation. A router over the skills in this repo | 1.2.3 |
 | [handoff](skills/dev/handoff/install_reference.md) | Compact the current conversation into a handoff document for another agent to pick up | 1.2.3 |
@@ -176,6 +177,7 @@ Skills in `.agents/skills/` are repository-level tools for maintaining and insta
 | [yfb-execute-plan](skills/dev/yfb-execute-plan/SKILL.md) | Execute structured plans, verify each criterion, and return evidence-based feedback | 1.0.0 |
 | [dsh-orchestrator](skills/dev/dsh-orchestrator/SKILL.md) | Use when a supervisor model should direct implementation through local DeepSeek Harness (DSH), especially when DSH needs detailed instructions and the supervisor must perform checks and acceptance itself. | 1.1.0 |
 | [project-map](skills/dev/project-map/SKILL.md) | Use when a project needs documentation of feature flows, directory responsibilities, per-file functions, or guidance on where to make future code changes. | 1.0.0 |
+| [fix-one-by-cr-docs](skills/dev/fix-one-by-cr-docs/SKILL.md) | Fix code review document findings one at a time — verify each claim, confirm the plan, then TDD the fix and report the remaining count | 1.0.0 |
 
 ---
 
