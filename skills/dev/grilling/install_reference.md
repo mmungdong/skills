@@ -2,7 +2,7 @@
 
 - **来源**: https://github.com/mattpocock/skills
 - **类型**: git
-- **版本**: 1.2.3
+- **版本**: 1.3.2
 - **路径**: skills/productivity/grilling
 
 ## 安装

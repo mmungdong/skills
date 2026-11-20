@@ -164,15 +164,15 @@ Skills in `.agents/skills/` are repository-level tools for maintaining and insta
 | [code-reviewer](skills/dev/code-reviewer/install_reference.md) | Comprehensive code review skill for TypeScript, JavaScript, Python, Swift, Kotlin, Go — automated analysis, best-practice checking, security scanning, and review checklists | 1.29.6 |
 | [ui-ux-pro-max](skills/dev/ui-ux-pro-max/install_reference.md) | UI/UX design intelligence — 50 styles, 21 palettes, 50 font pairings, 20 charts, 9 stacks (React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter, Tailwind, shadcn/ui) | 1.29.6 |
 | [security-audit](skills/dev/security-audit/install_reference.md) | Multi-phase security audit — threat modeling, attack-surface enumeration, independently verified machine-readable findings | c1c8a8c |
-| [grill-with-docs](skills/dev/grill-with-docs/install_reference.md) | A relentless interview to sharpen a plan or design, also creating docs (ADRs and glossary) as you go | 1.2.3 |
-| [ask-matt](skills/dev/ask-matt/install_reference.md) | Ask which skill or flow fits your situation. A router over the skills in this repo | 1.2.3 |
-| [handoff](skills/dev/handoff/install_reference.md) | Compact the current conversation into a handoff document for another agent to pick up | 1.2.3 |
-| [wait-what](skills/dev/wait-what/install_reference.md) | Re-pitch the previous response when it did not land with the user | 1.2.3 |
-| [writing-for-agents](skills/dev/writing-for-agents/install_reference.md) | Write documents for agents, including skills and AGENTS.md or CLAUDE.md instructions | 1.2.3 |
-| [grill-me](skills/dev/grill-me/install_reference.md) | A relentless interview to sharpen a plan or design — lightweight, conversation-only | 1.2.3 |
-| [grilling](skills/dev/grilling/install_reference.md) | Grill the user relentlessly about a plan, decision, or idea; triggers on 'grill' phrases | 1.2.3 |
-| [domain-modeling](skills/dev/domain-modeling/install_reference.md) | Build and sharpen a project's domain model — ubiquitous language, GLOSSARY.md, ADRs | 1.2.3 |
-| [diagnosing-bugs](skills/dev/diagnosing-bugs/install_reference.md) | Diagnosis loop for hard bugs and performance regressions — root cause before fixes | 1.2.3 |
+| [grill-with-docs](skills/dev/grill-with-docs/install_reference.md) | A relentless interview to sharpen a plan or design, also creating docs (ADRs and glossary) as you go | 1.3.2 |
+| [ask-matt](skills/dev/ask-matt/install_reference.md) | Ask which skill or flow fits your situation. A router over the skills in this repo | 1.3.2 |
+| [handoff](skills/dev/handoff/install_reference.md) | Compact the current conversation into a handoff document for another agent to pick up | 1.3.2 |
+| [wait-what](skills/dev/wait-what/install_reference.md) | Re-pitch the previous response when it did not land with the user | 1.3.2 |
+| [writing-for-agents](skills/dev/writing-for-agents/install_reference.md) | Write documents for agents, including skills and AGENTS.md or CLAUDE.md instructions | 1.3.2 |
+| [grill-me](skills/dev/grill-me/install_reference.md) | A relentless interview to sharpen a plan or design — lightweight, conversation-only | 1.3.2 |
+| [grilling](skills/dev/grilling/install_reference.md) | Grill the user relentlessly about a plan, decision, or idea; triggers on 'grill' phrases | 1.3.2 |
+| [domain-modeling](skills/dev/domain-modeling/install_reference.md) | Build and sharpen a project's domain model — ubiquitous language, GLOSSARY.md, ADRs | 1.3.2 |
+| [diagnosing-bugs](skills/dev/diagnosing-bugs/install_reference.md) | Diagnosis loop for hard bugs and performance regressions — root cause before fixes | 1.3.2 |
 | [yfb-write-plan](skills/dev/yfb-write-plan/SKILL.md) | Turn requests into executable plans and review execution reports with evidence | 1.0.0 |
 | [yfb-execute-plan](skills/dev/yfb-execute-plan/SKILL.md) | Execute structured plans, verify each criterion, and return evidence-based feedback | 1.0.0 |
 | [dsh-orchestrator](skills/dev/dsh-orchestrator/SKILL.md) | Use when a supervisor model should direct implementation through local DeepSeek Harness (DSH), especially when DSH needs detailed instructions and the supervisor must perform checks and acceptance itself. | 1.1.0 |

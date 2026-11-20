@@ -2,7 +2,7 @@
 
 - **来源**: https://github.com/mattpocock/skills
 - **类型**: git
-- **版本**: 1.2.3
+- **版本**: 1.3.2
 
 ## 安装
 
@@ -66,6 +66,7 @@ git clone https://github.com/mattpocock/skills.git ~/.claude/skills/mattpocock-s
 
 | Skill | Description | 已集成 |
 |-------|-------------|--------|
+| chief-of-staff | 在单个会话内协调子 Agent，持续推进一个长期目标。 | ❌ |
 | claude-handoff | 把当前对话交接给一个新的后台 Agent，由其立即接手后续工作。 | ❌ |
 | loop-me | 在当前工作区内，围绕用户想构建的工作流 spec 持续追问。 | ❌ |
 | setup-ts-deep-modules | 将 dependency-cruiser 接入 TypeScript 仓库，使每个 package 成为深模块：实现隐藏在子目录中，只能通过入口文件访问。由用户主动调用。 | ❌ |

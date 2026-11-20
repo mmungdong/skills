@@ -164,15 +164,15 @@ ln -s "$(pwd)/skills/dev/my-skill" ~/.opencode/skills/my-skill
 | [code-reviewer](skills/dev/code-reviewer/install_reference.md) | 综合代码审查 skill，支持 TypeScript/JavaScript/Python/Swift/Kotlin/Go，含自动分析、最佳实践检查、安全扫描和审查清单 | 1.29.6 |
 | [ui-ux-pro-max](skills/dev/ui-ux-pro-max/install_reference.md) | UI/UX 设计智能，50 种风格、21 种配色、50 种字体搭配、20 种图表、9 种技术栈 | 1.29.6 |
 | [security-audit](skills/dev/security-audit/install_reference.md) | 多阶段安全审计 skill：威胁建模、攻击面枚举与独立验证，产出自验证的机器可读漏洞发现 | c1c8a8c |
-| [grill-with-docs](skills/dev/grill-with-docs/install_reference.md) | 反复盘问以打磨计划或设计，过程中沉淀 ADR 和术语表等文档 | 1.2.3 |
-| [ask-matt](skills/dev/ask-matt/install_reference.md) | 询问哪种 skill 或流程适合当前情境——本仓库技能的路由器 | 1.2.3 |
-| [handoff](skills/dev/handoff/install_reference.md) | 将当前对话压缩成结构化交接文档，供另一个 Agent 接手继续工作 | 1.2.3 |
-| [wait-what](skills/dev/wait-what/install_reference.md) | 当上一条信息未被理解时，停下来换一种方式重新说明 | 1.2.3 |
-| [writing-for-agents](skills/dev/writing-for-agents/install_reference.md) | 为 Agent 编写文档，适用于 skills、AGENTS.md 与 CLAUDE.md | 1.2.3 |
-| [grill-me](skills/dev/grill-me/install_reference.md) | 反复盘问以打磨计划或设计——轻量版，纯对话无文档沉淀 | 1.2.3 |
-| [grilling](skills/dev/grilling/install_reference.md) | 反复盘问用户以打磨计划、决策或想法；'grill' 等触发词驱动 | 1.2.3 |
-| [domain-modeling](skills/dev/domain-modeling/install_reference.md) | 构建并打磨项目领域模型——统一术语、维护 GLOSSARY.md、记录架构决策 | 1.2.3 |
-| [diagnosing-bugs](skills/dev/diagnosing-bugs/install_reference.md) | 疑难 bug 与性能回归的诊断循环——先定位根因再修复 | 1.2.3 |
+| [grill-with-docs](skills/dev/grill-with-docs/install_reference.md) | 反复盘问以打磨计划或设计，过程中沉淀 ADR 和术语表等文档 | 1.3.2 |
+| [ask-matt](skills/dev/ask-matt/install_reference.md) | 询问哪种 skill 或流程适合当前情境——本仓库技能的路由器 | 1.3.2 |
+| [handoff](skills/dev/handoff/install_reference.md) | 将当前对话压缩成结构化交接文档，供另一个 Agent 接手继续工作 | 1.3.2 |
+| [wait-what](skills/dev/wait-what/install_reference.md) | 当上一条信息未被理解时，停下来换一种方式重新说明 | 1.3.2 |
+| [writing-for-agents](skills/dev/writing-for-agents/install_reference.md) | 为 Agent 编写文档，适用于 skills、AGENTS.md 与 CLAUDE.md | 1.3.2 |
+| [grill-me](skills/dev/grill-me/install_reference.md) | 反复盘问以打磨计划或设计——轻量版，纯对话无文档沉淀 | 1.3.2 |
+| [grilling](skills/dev/grilling/install_reference.md) | 反复盘问用户以打磨计划、决策或想法；'grill' 等触发词驱动 | 1.3.2 |
+| [domain-modeling](skills/dev/domain-modeling/install_reference.md) | 构建并打磨项目领域模型——统一术语、维护 GLOSSARY.md、记录架构决策 | 1.3.2 |
+| [diagnosing-bugs](skills/dev/diagnosing-bugs/install_reference.md) | 疑难 bug 与性能回归的诊断循环——先定位根因再修复 | 1.3.2 |
 | [yfb-write-plan](skills/dev/yfb-write-plan/SKILL.md) | 将需求转为可执行方案，并基于证据评审执行报告 | 1.0.0 |
 | [yfb-execute-plan](skills/dev/yfb-execute-plan/SKILL.md) | 执行结构化方案、验证每项标准并返回带证据的反馈 | 1.0.0 |
 | [dsh-orchestrator](skills/dev/dsh-orchestrator/SKILL.md) | Use when a supervisor model should direct implementation through local DeepSeek Harness (DSH), especially when DSH needs detailed instructions and the supervisor must perform checks and acceptance itself. | 1.1.0 |
